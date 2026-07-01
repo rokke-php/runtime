@@ -71,12 +71,6 @@
 		"analyse": "Ejecuta PHPStan para análisis estático",
 		"check": "Ejecuta lint, analyse y test en secuencia"
 	},
-	"repositories": [
-		{
-			"type": "path",
-			"url": "../contracts"
-		}
-	],
 	"minimum-stability": "stable",
 	"prefer-stable": true
 }
