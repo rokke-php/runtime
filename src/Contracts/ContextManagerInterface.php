@@ -26,4 +26,9 @@ interface ContextManagerInterface
 	 * Destroys and cleans up the context of the current coroutine.
 	 */
 	public function destroyCurrent(): void;
+
+	/**
+	 * Returns true when called from inside an active Swoole coroutine.
+	 */
+	public function isInCoroutine(): bool;
 }
