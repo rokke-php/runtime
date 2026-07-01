@@ -6,15 +6,14 @@ namespace Rokke\Runtime\Builder;
 
 use Rokke\Contracts\Lifecycle\LifecycleEventsInterface;
 use Rokke\Runtime\Application;
-use Rokke\Runtime\Compiled\CompiledRuntime;
+use Rokke\Runtime\Build\ModelBuilder;
+use Rokke\Runtime\Build\OperationModelBuilderPass;
 use Rokke\Runtime\ContextManager;
 use Rokke\Runtime\Contracts\ContextManagerInterface;
 use Rokke\Runtime\Contracts\HostInterface;
 use Rokke\Runtime\Contracts\LifecycleManagerInterface;
 use Rokke\Runtime\Contracts\ModuleSystemInterface;
 use Rokke\Runtime\Contracts\PoolManagerInterface;
-use Rokke\Runtime\Engine\ExecutionEngine;
-use Rokke\Runtime\Engine\Invoker;
 use Rokke\Runtime\Host;
 use Rokke\Runtime\Lifecycle;
 use Rokke\Runtime\Module\ModuleBuilder;
@@ -41,14 +40,17 @@ final class ApplicationBuilder
 		$container->singleton(ModuleSystemInterface::class, $moduleSystem);
 		$container->singleton(HostInterface::class, $serverHost);
 
-		// Run the build phase: collect capabilities from all registered modules
+		// Discovery phase
 		$moduleBuilder = new ModuleBuilder();
 		$moduleSystem->buildAll($moduleBuilder);
 
-		// Compile the application graph into an executable runtime
-		$compiledRuntime = new CompiledRuntime([], [], [], [], []);
-		$invoker         = new Invoker($compiledRuntime);
-		$runtime         = new ExecutionEngine($invoker);
+		// Modeling phase
+		$modelBuilder = new ModelBuilder([new OperationModelBuilderPass()]);
+		$model        = $modelBuilder->build($moduleBuilder->getCapabilities());
+
+		// Assembly phase
+		$runtimeBuilder = new DefaultRuntimeBuilder();
+		$runtime        = $runtimeBuilder->build($model);
 
 		return new Application($container, $lifecycle, $serverHost, $runtime);
 	}

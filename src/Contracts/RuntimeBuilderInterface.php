@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Contracts;
 
+use Rokke\Runtime\Build\ApplicationModel;
+
 /**
- * Orchestrates the transformation of the ApplicationGraph into an executable Runtime.
- * Runs the compilation pass pipeline: validation, optimization, linking.
+ * Transforms a fully-built ApplicationModel into an executable Runtime.
+ * Runs after all ModelBuilderPasses have populated the ApplicationModel.
  */
 interface RuntimeBuilderInterface
 {
-	public function build(ApplicationGraphInterface $graph): RuntimeInterface;
+	public function build(ApplicationModel $model): RuntimeInterface;
 }
