@@ -69,16 +69,22 @@ final class Lifecycle implements LifecycleEventsInterface, LifecycleManagerInter
 	{
 		$this->state = $newState;
 
-		$hookName = strtolower($newState->name);
+		$hookName  = strtolower($newState->name);
+		$failures  = [];
 
 		if (isset($this->hooks[$hookName])) {
 			foreach ($this->hooks[$hookName] as $callback) {
 				try {
 					$callback();
-				} catch (\Throwable) {
-					// Continue firing remaining hooks; swallow individual failures
+				} catch (\Throwable $e) {
+					$failures[] = $e;
 				}
 			}
+		}
+
+		if ($failures !== []) {
+			$messages = implode('; ', array_map(fn (\Throwable $e): string => $e->getMessage(), $failures));
+			throw new \RuntimeException("Lifecycle hook(s) failed during {$newState->name}: {$messages}");
 		}
 	}
 }
