@@ -61,7 +61,7 @@ jobs:
           json.dump(sarif, open('/tmp/audit.sarif', 'w'))
           PYEOF
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: /tmp/audit.sarif
           category: security
