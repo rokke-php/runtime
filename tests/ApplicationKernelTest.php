@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Rokke\Contracts\Module\CapabilityInterface;
 use Rokke\Contracts\Module\ModuleBuilderInterface;
 use Rokke\Contracts\Module\ModuleInterface;
 use Rokke\Runtime\ApplicationKernel;
@@ -82,14 +81,14 @@ final class ApplicationKernelTest extends TestCase
 	{
 		$kernel = new ApplicationKernel();
 
-		$modA = new class implements ModuleInterface {
+		$modA = new class () implements ModuleInterface {
 			public function register(ModuleBuilderInterface $builder): void
 			{
 				$builder->addCapability(new OperationCapability('mod-a', 'A', static fn (): string => 'a'));
 			}
 		};
 
-		$modB = new class implements ModuleInterface {
+		$modB = new class () implements ModuleInterface {
 			public function register(ModuleBuilderInterface $builder): void
 			{
 				$builder->addCapability(new OperationCapability('mod-b', 'B', static fn (): string => 'b'));
