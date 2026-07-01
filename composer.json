@@ -1,0 +1,75 @@
+{
+	"name": "rokke/runtime",
+	"description": "Rokke Runtime – A persistent, coroutine-driven execution platform for modern PHP applications. The foundation of the Rokke Framework.",
+	"type": "library",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Fernando Duarte",
+			"email": "fduarte@rokke.dev"
+		}
+	],
+	"keywords": [
+		"framework",
+		"runtime",
+		"coroutine",
+		"enterprise",
+		"async",
+		"php"
+	],
+	"homepage": "https://rokke.dev",
+	"support": {
+		"issues": "https://github.com/rokke-php/runtime/issues",
+		"source": "https://github.com/rokke-php/runtime"
+	},
+	"require": {
+		"php": ">=8.4",
+		"ext-swoole": ">=5.0",
+		"psr/container": "^2.0",
+		"rokke/contracts": "^0.2"
+	},
+	"require-dev": {
+		"friendsofphp/php-cs-fixer": "^3.64",
+		"phpstan/phpstan": "^1.12",
+		"phpstan/phpstan-phpunit": "^1.4",
+		"phpunit/phpunit": "^13.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"Rokke\\Runtime\\": "src/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"Rokke\\Runtime\\Tests\\": "tests/"
+		}
+	},
+	"config": {
+		"optimize-autoloader": true,
+		"sort-packages": true,
+		"preferred-install": "dist",
+		"allow-plugins": {}
+	},
+	"scripts": {
+		"test": "phpunit",
+		"test:coverage": "phpunit --coverage-html coverage/",
+		"lint": "php-cs-fixer fix --dry-run --diff --verbose",
+		"lint:fix": "php-cs-fixer fix",
+		"analyse": "phpstan analyse --memory-limit=2G",
+		"check": [
+			"@lint",
+			"@analyse",
+			"@test"
+		]
+	},
+	"scripts-descriptions": {
+		"test": "Ejecuta la suite de pruebas",
+		"test:coverage": "Ejecuta pruebas con reporte de cobertura HTML",
+		"lint": "Verifica el estilo del código sin modificar",
+		"lint:fix": "Corrige automáticamente el estilo del código",
+		"analyse": "Ejecuta PHPStan para análisis estático",
+		"check": "Ejecuta lint, analyse y test en secuencia"
+	},
+	"minimum-stability": "stable",
+	"prefer-stable": true
+}

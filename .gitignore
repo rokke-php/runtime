@@ -1,0 +1,39 @@
+/vendor/
+/composer.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PHP
+.php-cs-fixer.php
+.php-cs-fixer.cache
+.phpunit.result.cache
+.phpstan-cache/
+.php-tools/
+
+# Testing & Coverage
+coverage/
+.phpunit/
+.phpunit.cache/
+
+# Environment
+.env
+.env.local
+
+# AI Tools
+.claude/
+.copilot/
+.codeium/
+.ai/
+.ai-*
+*.ai
+.llm/
+.superpowers/

@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate tag against composer.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          COMPOSER_VERSION=$(jq -r '.version // empty' composer.json)
+          if [ -z "$COMPOSER_VERSION" ]; then
+            echo "::error::composer.json has no version field"
+            exit 1
+          fi
+          if [ "$TAG" != "$COMPOSER_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match composer.json version $COMPOSER_VERSION"
+            exit 1
+          fi
+
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          make_latest: true
+
+  packagist:
+    name: Notify Packagist
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: Production
+    steps:
+      - name: Trigger package update
+        run: |
+          HTTP_STATUS=$(curl -sS -o /tmp/packagist_response.json -w "%{http_code}" \
+            -X POST \
+            "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"repository":{"url":"https://github.com/rokke-php/runtime"}}')
+          cat /tmp/packagist_response.json
+          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 202 ]; then
+            echo "::error::Packagist API returned HTTP $HTTP_STATUS"
+            exit 1
+          fi

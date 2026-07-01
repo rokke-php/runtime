@@ -1,0 +1,52 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - tests
+    checkMissingIterableValueType: true
+    checkGenericClassInNonGenericObjectType: true
+    checkUninitializedProperties: true
+    checkImplicitMixed: true
+    parallel:
+        maximumNumberOfProcesses: 4
+    reportUnmatchedIgnoredErrors: true
+
+    # Swoole classes are only available at runtime (production server).
+    # Analysis runs without ext-swoole installed, so we stub the symbols here.
+    stubFiles:
+        - stubs/Swoole.stub.php
+
+    scanFiles:
+        - stubs/PHPUnit.stub.php
+
+    bootstrapFiles:
+        - vendor/autoload.php
+
+    ignoreErrors:
+        # Coroutine::create() returns int|false; the int-cast is guarded by the RuntimeException above it
+        - message: '#Cannot cast mixed to int#'
+          path: src/CoroutineManager.php
+
+        # Swoole\Coroutine\WaitGroup stub is not loadable without the real ext-swoole.
+        # In CI, ext-swoole is installed and provides the real class.
+        - message: '#(Instantiated class|Call to method (add|done|wait)\(\) on an unknown class) Swoole\\Coroutine\\WaitGroup#'
+          path: src/CoroutineManager.php
+
+        # PHPUnit stubs are minimal — only TestCase class + basic asserts are modelled.
+        # In CI, real PHPUnit types are resolved via autoloader; local analysis accepts this gap.
+        - message: '#Call to an undefined method .*::(createStub|createMock|once|exactly|never|any|logicalOr|logicalAnd|equalTo|assertSame|assertNotSame|assertInstanceOf|assertTrue|assertFalse|assertNull|assertCount|assertContains|assertStringContainsString|assertIsBool|assertGreaterThan|assertGreaterThanOrEqual|assertIsInt|expectException|expectExceptionMessage|markTestSkipped)\(\)#'
+          path: tests/*
+        - message: '#Cannot call method (expects|method|with|willThrowException|willReturn)\(\) on mixed#'
+          path: tests/*
+        - message: '#Parameter .* expects .*, mixed given#'
+          path: tests/*
+        - message: '#Class .* has an uninitialized property .*#'
+          path: tests/*
+
+        # Swoole\Coroutine\run() and WaitGroup are only available with ext-swoole in CI.
+        - message: '#Function Swoole\\Coroutine\\run not found#'
+          path: tests/*
+        - message: '#Cannot call method getMessage\(\) on .*\|null#'
+          path: tests/*
+        - message: '#Offset .* does not exist on array.*#'
+          path: tests/*

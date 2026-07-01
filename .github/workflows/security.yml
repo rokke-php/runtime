@@ -1,0 +1,65 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  audit:
+    name: Composer Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-security-${{ hashFiles('composer.json') }}
+          restore-keys: composer-security-
+      - run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
+      - name: Run composer audit
+        run: composer audit --format=json --no-dev 2>/dev/null | tee /tmp/audit.json; true
+      - name: Convert audit output to SARIF
+        run: |
+          python3 - <<'PYEOF'
+          import json, sys
+          try:
+              data = json.load(open('/tmp/audit.json'))
+          except Exception:
+              data = {}
+          advisories = data.get('advisories', {})
+          results = []
+          for pkg, advs in advisories.items():
+              for adv in (advs if isinstance(advs, list) else [advs]):
+                  results.append({
+                      "ruleId": adv.get('cve', adv.get('advisoryId', 'UNKNOWN')),
+                      "message": {"text": adv.get('title', 'Unknown advisory')},
+                      "locations": [{"physicalLocation": {"artifactLocation": {"uri": "composer.json"}}}],
+                      "properties": {"severity": adv.get('severity', 'medium')}
+                  })
+          sarif = {
+              "$schema": "https://json.schemastore.org/sarif-2.1.0",
+              "version": "2.1.0",
+              "runs": [{"tool": {"driver": {"name": "composer-audit", "version": "1.0.0", "rules": []}}, "results": results}]
+          }
+          json.dump(sarif, open('/tmp/audit.sarif', 'w'))
+          PYEOF
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: /tmp/audit.sarif
+          category: security
