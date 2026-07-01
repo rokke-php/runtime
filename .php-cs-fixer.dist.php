@@ -66,6 +66,7 @@ return $config
 		'simplified_if_return' => true,
 		'simplified_null_return' => true,
 		'single_line_empty_body' => true,
+		'no_unneeded_parentheses' => false,
 		'void_return' => true,
 		'php_unit_construct' => true,
 		'php_unit_dedicate_assert' => true,

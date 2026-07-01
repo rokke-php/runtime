@@ -33,8 +33,8 @@ final class ApplicationKernel
 		$moduleBuilder = new ModuleBuilder();
 		$this->modules->buildAll($moduleBuilder);
 
-		$model         = new ModelBuilder([new OperationModelBuilderPass()])->build($moduleBuilder->getCapabilities());
-		$this->runtime = new DefaultRuntimeBuilder()->build($model);
+		$model         = (new ModelBuilder([new OperationModelBuilderPass()]))->build($moduleBuilder->getCapabilities());
+		$this->runtime = (new DefaultRuntimeBuilder())->build($model);
 	}
 
 	/** @param array<string, mixed> $metadata */
