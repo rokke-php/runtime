@@ -61,7 +61,7 @@ jobs:
           file_put_contents("/tmp/phpstan.sarif", json_encode($sarif, JSON_PRETTY_PRINT));
           '
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: /tmp/phpstan.sarif
           category: code-quality
