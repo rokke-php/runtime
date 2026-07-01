@@ -42,6 +42,8 @@ parameters:
           path: tests/*
         - message: '#Parameter .* expects .*, mixed given#'
           path: tests/*
+        - message: '#Method .* should return .* but returns mixed#'
+          path: tests/*
         - message: '#Class .* has an uninitialized property .*#'
           path: tests/*
 
