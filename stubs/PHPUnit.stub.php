@@ -40,4 +40,17 @@ abstract class TestCase extends Assert
 
     /** @return never */
     public function markTestSkipped(string $message = ''): void {}
+
+    /** @return never */
+    public function fail(string $message = ''): void {}
+
+    public static function assertStringContainsString(string $needle, string $haystack, string $message = ''): void {}
+
+    public static function assertIsInt(mixed $actual, string $message = ''): void {}
+
+    public static function assertIsBool(mixed $actual, string $message = ''): void {}
+
+    public static function assertGreaterThan(mixed $expected, mixed $actual, string $message = ''): void {}
+
+    public static function assertGreaterThanOrEqual(mixed $expected, mixed $actual, string $message = ''): void {}
 }

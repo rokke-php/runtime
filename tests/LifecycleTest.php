@@ -161,9 +161,57 @@ final class LifecycleTest extends TestCase
 			$secondFired = true;
 		});
 
-		$this->lifecycle->transitionTo(ApplicationState::Starting);
+		try {
+			$this->lifecycle->transitionTo(ApplicationState::Starting);
+		} catch (\RuntimeException) {
+		}
 
 		$this->assertTrue($secondFired);
+	}
+
+	public function testThrowsAfterAllHooksFireWhenOneThrows(): void
+	{
+		$this->lifecycle->onRunning(function (): void {
+			throw new \RuntimeException('hook failed');
+		});
+
+		$this->expectException(\RuntimeException::class);
+
+		$this->lifecycle->transitionTo(ApplicationState::Running);
+	}
+
+	public function testExceptionMessageContainsFailingHookMessage(): void
+	{
+		$this->lifecycle->onRunning(function (): void {
+			throw new \RuntimeException('db connection lost');
+		});
+
+		try {
+			$this->lifecycle->transitionTo(ApplicationState::Running);
+			$this->fail('Expected RuntimeException not thrown.');
+		} catch (\RuntimeException $e) {
+			$this->assertStringContainsString('db connection lost', $e->getMessage());
+			$this->assertStringContainsString('Running', $e->getMessage());
+		}
+	}
+
+	public function testExceptionMessageCombinesMultipleHookFailures(): void
+	{
+		$this->lifecycle->onStopping(function (): void {
+			throw new \RuntimeException('first fail');
+		});
+
+		$this->lifecycle->onStopping(function (): void {
+			throw new \RuntimeException('second fail');
+		});
+
+		try {
+			$this->lifecycle->transitionTo(ApplicationState::Stopping);
+			$this->fail('Expected RuntimeException not thrown.');
+		} catch (\RuntimeException $e) {
+			$this->assertStringContainsString('first fail', $e->getMessage());
+			$this->assertStringContainsString('second fail', $e->getMessage());
+		}
 	}
 
 	public function testCanTransitionToFromCreated(): void

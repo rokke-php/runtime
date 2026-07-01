@@ -130,16 +130,12 @@ final class ServiceContainer implements ServiceContainerInterface
 
 		$resource = $this->resourceManager->acquire($poolName);
 
-		if ($this->contextManager !== null) {
-			try {
-				$context         = $this->contextManager->current();
-				$resourceManager = $this->resourceManager;
-				$context->onDestroy(static function () use ($resourceManager, $poolName, $resource): void {
-					$resourceManager->release($poolName, $resource);
-				});
-			} catch (\Throwable) {
-				// Outside a coroutine context — manual release is the user's responsibility
-			}
+		if ($this->contextManager !== null && $this->contextManager->isInCoroutine()) {
+			$context         = $this->contextManager->current();
+			$resourceManager = $this->resourceManager;
+			$context->onDestroy(static function () use ($resourceManager, $poolName, $resource): void {
+				$resourceManager->release($poolName, $resource);
+			});
 		}
 
 		return $resource;

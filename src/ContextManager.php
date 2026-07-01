@@ -51,6 +51,11 @@ final class ContextManager implements ContextManagerInterface
 		return $context;
 	}
 
+	public function isInCoroutine(): bool
+	{
+		return Coroutine::getCid() !== -1;
+	}
+
 	public function destroyCurrent(): void
 	{
 		$cid = Coroutine::getCid();

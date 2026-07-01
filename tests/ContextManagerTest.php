@@ -103,6 +103,22 @@ final class ContextManagerTest extends TestCase
 		$this->assertInstanceOf(RuntimeException::class, $exception);
 	}
 
+	public function testIsInCoroutineReturnsFalseOutsideCoroutine(): void
+	{
+		$this->assertFalse($this->manager->isInCoroutine());
+	}
+
+	public function testIsInCoroutineReturnsTrueInsideCoroutine(): void
+	{
+		$result = null;
+
+		\Swoole\Coroutine\run(function () use (&$result): void {
+			$result = $this->manager->isInCoroutine();
+		});
+
+		$this->assertTrue($result);
+	}
+
 	public function testContextIdIsUnique(): void
 	{
 		$idA = null;
