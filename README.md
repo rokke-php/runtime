@@ -1,25 +1,10 @@
-# Rokke Runtime
+# rokke/runtime
 
-Persistent, coroutine-driven execution platform for modern PHP applications. Foundation of the Rokke Framework.
+Persistent, coroutine-driven execution platform built on Swoole. Foundation of the Rokke Framework.
 
-## Features
+## What this is
 
-- **Coroutine-Driven**: Built on Swoole for non-blocking, concurrent execution
-- **Module System**: Pluggable, composable application modules
-- **Event Bus**: Publish-subscribe event handling across application
-- **Pipeline Architecture**: Handler chains for processing requests
-- **Resource Management**: Lifecycle-aware resource pooling and cleanup
-- **Service Container**: PSR-11 compatible dependency injection
-- **Context Management**: Request-scoped context propagation
-- **Diagnostics**: Built-in monitoring, timing, and observability
-- **Signal Handling**: OS signal handling and graceful shutdown
-- **Worker Management**: Multi-worker orchestration with supervisor
-
-## Requirements
-
-- PHP 8.4+
-- Swoole Extension
-- Composer
+`rokke/runtime` wires together the core infrastructure every Rokke application needs: lifecycle management, a PSR-11 service container, per-request context propagation, resource pooling, an event bus, a middleware pipeline, and a zero-Reflection execution engine. It consumes `rokke/contracts` and exposes a single `ApplicationBuilder` entry point.
 
 ## Installation
 
@@ -27,7 +12,9 @@ Persistent, coroutine-driven execution platform for modern PHP applications. Fou
 composer require rokke/runtime
 ```
 
-## Quick Start
+**Requirements:** PHP 8.4+ · Swoole 5.0+
+
+## Quick start
 
 ```php
 <?php
@@ -36,125 +23,63 @@ require 'vendor/autoload.php';
 
 use Rokke\Runtime\Builder\ApplicationBuilder;
 
-// Auto-assembles Container, Contexts, Pools, EventBus, and Server
 $app = ApplicationBuilder::create('0.0.0.0', 8000);
 
-// Register modules (optional)
-// $app->container()->get(ModuleSystemInterface::class)->register(new MyHttpModule());
+// Register modules before run()
+// $app->container()->get(ModuleSystemInterface::class)->register(new MyModule());
 
-$app->run();
+$app->run(); // blocks — starts the Swoole TCP server
 ```
 
-## Architecture
+## Core components
 
-### Core Components
+| Component | Class | Role |
+|---|---|---|
+| Application | `Application` | Entry point; drives lifecycle → host |
+| ApplicationBuilder | `ApplicationBuilder` | Assembles and wires all components |
+| Lifecycle | `Lifecycle` | State machine + hook dispatcher |
+| ServiceContainer | `ServiceContainer` | PSR-11 DI with singletons, transients, pooled |
+| ContextManager | `ContextManager` | Per-coroutine request context |
+| CoroutineManager | `CoroutineManager` | Coroutine creation, await, parallel |
+| ResourcePool | `ResourcePool` | Bounded connection pool (Swoole Channel) |
+| ResourceManager | `ResourceManager` | Pool registry and lifecycle |
+| EventBus | `EventBus` | Sync, coroutine, and background dispatch |
+| PipelineEngine | `PipelineEngine` | Middleware handler chains |
+| ExecutionEngine | `ExecutionEngine` | Zero-Reflection middleware + invoker pipeline |
+| ModuleSystem | `ModuleSystem` | Builder-pattern module registration |
+| Host | `Host` | Swoole TCP server adapter |
 
-- **Application**: Entry point, orchestrates runtime lifecycle
-- **Host**: Environment and system-level operations
-- **Context**: Request-scoped data container
-- **CoroutineManager**: Coroutine creation and lifecycle
-- **ModuleSystem**: Module registration and initialization
-- **EventBus**: Async event dispatch
-- **PipelineEngine**: Request handler chains
-- **ResourceManager**: Pool management and cleanup
-- **ServiceContainer**: Dependency resolution
-- **Scheduler**: Task scheduling and execution
-- **RuntimeSupervisor**: Process monitoring and worker management
-- **ErrorManager**: Centralized error handling
-- **Diagnostics**: Performance metrics and monitoring
+## Execution model
 
-### Module System
-
-Modules extend runtime capabilities. Each module:
-- Registers services in container
-- Subscribes to lifecycle events
-- May define event handlers
-- Can manage resources
-
-### Request Flow
-
-1. HTTP request arrives
-2. Context created with request data
-3. Pipeline executes handler chain
-4. Handlers process via coroutines
-5. Response returned, context cleaned up
-
-## Development
-
-### Setup
-
-```bash
-composer install
-composer lint:fix
+```
+ApplicationBuilder::create()
+  └─ ModuleSystem::buildAll($builder)   ← modules register capabilities
+  └─ CompiledRuntime                    ← immutable in-memory graph
+  └─ Invoker                            ← resolves operations by integer ID
+  └─ ExecutionEngine                    ← wraps Invoker in middleware pipeline
+  └─ Application                        ← injects runtime + host + lifecycle
+        └─ Host::start($runtime)        ← Swoole server starts, blocks
 ```
 
-### Testing
+Operations are compiled once at build time. Integer IDs avoid string lookups and memory duplication on the hot path.
 
-```bash
-# Run test suite
-composer test
+## Lifecycle states
 
-# With coverage report
-composer test:coverage
+`Created → Bootstrapping → Starting → Running → Stopping → Stopped`
 
-# Static analysis
-composer analyse
+Hook into transitions via `LifecycleEventsInterface`:
 
-# Full quality check
-composer check
+```php
+$lifecycle = $app->container()->get(LifecycleEventsInterface::class);
+$lifecycle->onRunning(fn () => printf("Server listening on %s:%d\n", $host, $port));
 ```
 
-### Code Standards
+If any hook throws, the remaining hooks still fire and a single `RuntimeException` is raised collecting all messages.
 
-- PSR-12 coding standard (auto-enforced via PHP CS Fixer)
-- Static analysis via PHPStan (Level 8)
-- 100% type hints required
-- Test coverage for new code
+## Stability
 
-### Workflow
-
-1. Branch from `main`
-2. Make focused changes (one feature/fix per PR)
-3. Add tests (unit + integration)
-4. Run full check suite: `composer check`
-5. Submit PR with clear description
-
-## Testing Strategy
-
-### Unit Tests
-- Test individual components in isolation
-- Mock dependencies
-- Focus on behavior, not implementation
-
-### Integration Tests
-- Test component interactions
-- Use real instances where practical
-- Verify lifecycle and state transitions
-
-### Test Patterns
-
-- Use test fixtures for common setups
-- Name tests descriptively: `testDoesXWhenConditionY()`
-- One assertion per test when possible
-- Group related tests in TestCase classes
-
-## Performance Considerations
-
-- Leverage coroutines for I/O-bound operations
-- Use resource pooling for connections
-- Monitor diagnostics for bottlenecks
-- Profile with Swoole profiler before optimizing
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+This is a `0.x` release. Interfaces in `Rokke\Runtime\Contracts\*` are internal and may change between minor versions. Public-facing contracts live in `rokke/contracts`.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/rokke-php/runtime/issues)
-- **Documentation**: [rokke.dev](https://rokke.dev)
-- **Source**: [GitHub Repository](https://github.com/rokke-php/runtime)
+MIT

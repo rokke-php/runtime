@@ -1,54 +1,36 @@
 # Changelog
 
-All notable changes to Rokke Runtime documented here.
+All notable changes to `rokke/runtime` are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
-
-### Added
-- Initial project scaffolding
-- Core runtime contracts and interfaces
-- Application builder and lifecycle management
-- Context manager for request-scoped data
-- Coroutine manager for async execution
-- Module system for feature composition
-- Event bus for publish-subscribe
-- Pipeline engine for request handling
-- Resource management and pooling
-- Service container (PSR-11 compatible)
-- Host abstraction for environment operations
-- Error manager for centralized error handling
-- Signal manager for OS signal handling
-- Worker manager for multi-worker orchestration
-- Runtime supervisor for process monitoring
-- Scheduler for task scheduling
-- Diagnostics system for monitoring/metrics
-- Comprehensive test suite
-- PHP CS Fixer configuration
-- PHPStan static analysis
-- Complete documentation (README, CONTRIBUTING)
-
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-## Release History
-
-No releases yet. Currently in development.
-
 ---
 
-## Format Guidelines
+## [0.1.0] — 2026-06-30
 
-- `[Unreleased]` section for work in progress
-- Dated sections for releases (YYYY-MM-DD)
-- Categories: Added, Changed, Deprecated, Removed, Fixed, Security
-- Breaking changes clearly marked
-- Link to PR/issue when available
+### Added
+
+- `Application` — entry point; drives lifecycle transitions and delegates to `Host`
+- `ApplicationBuilder` — single static factory wiring all components; two-phase build (modules → `CompiledRuntime` → `ExecutionEngine`)
+- `Lifecycle` — linear state machine (`Created → Bootstrapping → Starting → Running → Stopping → Stopped`); collects hook failures and re-raises after all hooks run
+- `ServiceContainer` — PSR-11 DI with singletons, transients, aliases, factory closures, and pooled bindings with coroutine-scoped auto-release
+- `ContextManager` — per-coroutine request context via Swoole coroutine context storage
+- `Context` — request-scoped key/value store with best-effort destroy callbacks
+- `CoroutineManager` — `go()`, `await()`, `parallel()`, `sleep()`, `cancel()` wrappers over Swoole coroutines
+- `ResourcePool` — bounded Swoole Channel-backed connection pool with min/max/timeout
+- `ResourceManager` — pool registry implementing `PoolManagerInterface`
+- `EventBus` — sync (`dispatchSync`), coroutine-per-listener (`dispatchCoroutine`), and background/distributed stubs
+- `PipelineEngine` — composable middleware handler chains
+- `ExecutionEngine` — zero-Reflection middleware pipeline; assembles via `array_reduce` + closure nesting
+- `Invoker` — resolves `OperationInterface` to its compiled handler by integer ID
+- `CompiledRuntime` / `CompiledOperation` — immutable in-memory application graph; integer IDs avoid string lookups on the hot path
+- `OperationContext` — per-request execution context with cooperative cancellation (`cancel()` / `throwIfCancelled()`)
+- `ModuleSystem` / `ModuleBuilder` — builder-pattern module registration; `buildAll()` drives the build phase
+- `Host` — Swoole TCP server adapter; server created lazily on first `start()` call
+- `Lifetime` — request lifetime tracker
+- Internal contracts: `ContextManagerInterface`, `LifecycleManagerInterface`, `PoolManagerInterface`, `ResourceManagerInterface`, `ModuleSystemInterface`, `InvokerInterface`, `RuntimeInterface`, `ApplicationInterface`, `HostInterface`, and capability/operation/context interfaces
+- PHPStan level max with Swoole and PHPUnit stubs
+- PHP CS Fixer with `@PSR12` + `@PHP84Migration`
+- PHPUnit test suite covering all implemented classes
+
+[0.1.0]: https://github.com/rokke-php/runtime/releases/tag/v0.1.0

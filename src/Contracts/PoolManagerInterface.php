@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Contracts;
 
-use Rokke\Contracts\Resources\ResourceProviderInterface;
-
-interface PoolManagerInterface extends ResourceProviderInterface
+interface PoolManagerInterface
 {
+	public function acquire(string $poolName): mixed;
+
+	public function release(string $poolName, mixed $resource): void;
+
 	public function registerPool(string $name, callable $factory, int $min, int $max, int $timeout): void;
 
 	/** @return array<string, mixed> */
