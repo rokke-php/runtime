@@ -42,6 +42,8 @@ jobs:
           except Exception:
               data = {}
           advisories = data.get('advisories', {})
+          if not isinstance(advisories, dict):
+              advisories = {}
           results = []
           for pkg, advs in advisories.items():
               for adv in (advs if isinstance(advs, list) else [advs]):

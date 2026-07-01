@@ -27,10 +27,12 @@ parameters:
         - message: '#Cannot cast mixed to int#'
           path: src/CoroutineManager.php
 
-        # Swoole\Coroutine\WaitGroup stub is not loadable without the real ext-swoole.
-        # In CI, ext-swoole is installed and provides the real class.
-        - message: '#(Instantiated class|Call to method (add|done|wait)\(\) on an unknown class) Swoole\\Coroutine\\WaitGroup#'
-          path: src/CoroutineManager.php
+        # WaitGroup is resolved from ext-swoole in CI but from the stub locally.
+        # reportUnmatched: false because CI always finds the class (no error to suppress there).
+        -
+            message: '#(Instantiated class|Call to method (add|done|wait)\(\) on an unknown class) Swoole\\Coroutine\\WaitGroup#'
+            path: src/CoroutineManager.php
+            reportUnmatched: false
 
         # PHPUnit stubs are minimal — only TestCase class + basic asserts are modelled.
         # In CI, real PHPUnit types are resolved via autoloader; local analysis accepts this gap.
