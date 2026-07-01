@@ -52,7 +52,7 @@ final class EventBus implements EventBusInterface
 	public function dispatchBackground(object $event): void
 	{
 		throw new \BadMethodCallException(
-			'Background dispatch is not implemented. Configure a Task Worker or Queue module before calling dispatchBackground().'
+			'Background dispatch is not implemented. Configure a Task Worker or Queue module before calling dispatchBackground().',
 		);
 	}
 

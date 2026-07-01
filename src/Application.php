@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime;
 
-use Rokke\Contracts\Lifecycle\ApplicationState;
 use Rokke\Contracts\Container\ServiceContainerInterface;
+use Rokke\Contracts\Lifecycle\ApplicationState;
 use Rokke\Runtime\Contracts\ApplicationInterface;
 use Rokke\Runtime\Contracts\HostInterface;
 use Rokke\Runtime\Contracts\LifecycleManagerInterface;

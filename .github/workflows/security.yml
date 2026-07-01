@@ -30,7 +30,7 @@ jobs:
           path: vendor
           key: composer-security-${{ hashFiles('composer.json') }}
           restore-keys: composer-security-
-      - run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
+      - run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader --ignore-platform-req=ext-swoole
       - name: Run composer audit
         run: composer audit --format=json --no-dev 2>/dev/null | tee /tmp/audit.json; true
       - name: Convert audit output to SARIF

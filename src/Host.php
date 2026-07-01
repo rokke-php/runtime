@@ -14,30 +14,30 @@ use Swoole\Server;
  */
 final class Host implements HostInterface
 {
-	private Server $server;
+	private ?Server $server = null;
 
-	public function __construct(string $host = '127.0.0.1', int $port = 8000)
-	{
-		// Initializes a master process with SWOOLE_PROCESS mode and TCP socket
-		$this->server = new Server($host, $port, SWOOLE_PROCESS, SWOOLE_TCP);
-	}
+	public function __construct(private readonly string $host = '127.0.0.1', private readonly int $port = 8000) {}
 
 	/**
-	 * Retrieves the native Swoole Server instance so modules can hook into it
-	 * (e.g., $server->on('request', ...), $server->addProcess(...)).
+	 * Returns the Swoole Server, creating it on first access.
+	 * Deferred so that constructing a Host does not bind a socket.
 	 */
 	public function getInternalServer(): Server
 	{
+		if ($this->server === null) {
+			$this->server = new Server($this->host, $this->port, SWOOLE_PROCESS, SWOOLE_TCP);
+		}
+
 		return $this->server;
 	}
 
 	public function start(RuntimeInterface $runtime): void
 	{
-		$this->server->start();
+		$this->getInternalServer()->start();
 	}
 
 	public function stop(): void
 	{
-		$this->server->shutdown();
+		$this->getInternalServer()->shutdown();
 	}
 }

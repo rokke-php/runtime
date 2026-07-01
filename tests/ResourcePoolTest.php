@@ -30,7 +30,7 @@ final class ResourcePoolTest extends TestCase
 			},
 			min: $min,
 			max: $max,
-			timeout: $timeout
+			timeout: $timeout,
 		);
 	}
 
