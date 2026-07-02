@@ -5,11 +5,21 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Engine;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Runtime\Build\CompiledFactory;
+use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
+use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
+use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Engine\Invoker;
+
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+
+final class InvokerServiceFixture {}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 final class InvokerTest extends TestCase
 {
@@ -26,6 +36,16 @@ final class InvokerTest extends TestCase
 		return $this->createStub(OperationContextInterface::class);
 	}
 
+	private function emptyPlan(): ArgumentResolutionPlan
+	{
+		return new ArgumentResolutionPlan([]);
+	}
+
+	private function contextPlan(): ArgumentResolutionPlan
+	{
+		return new ArgumentResolutionPlan([new ContextArgumentInstruction()]);
+	}
+
 	public function testThrowsWhenOperationIdNotFound(): void
 	{
 		$runtime = new CompiledRuntime([], [], [], [], []);
@@ -39,8 +59,9 @@ final class InvokerTest extends TestCase
 
 	public function testThrowsWhenHandlerIdNotInRuntime(): void
 	{
+		$plan    = $this->emptyPlan();
 		$op      = new CompiledOperation(0, 99, 0, 0);
-		$runtime = new CompiledRuntime([], [], [], [], ['op.a' => $op]);
+		$runtime = new CompiledRuntime([], [], [0 => $plan], [], ['op.a' => $op]);
 		$invoker = new Invoker($runtime);
 
 		$this->expectException(\RuntimeException::class);
@@ -49,12 +70,24 @@ final class InvokerTest extends TestCase
 		$invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
 	}
 
-	public function testInvokesHandlerAndReturnsResult(): void
+	public function testThrowsWhenArgumentPlanNotFound(): void
 	{
-		$handler = fn (OperationContextInterface $ctx): string => 'hello';
-
-		$op      = new CompiledOperation(0, 0, 0, 0);
+		$handler = fn (): string => 'ok';
+		$op      = new CompiledOperation(0, 0, 99, 0);
 		$runtime = new CompiledRuntime([], [0 => $handler], [], [], ['op.a' => $op]);
+		$invoker = new Invoker($runtime);
+
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('ArgumentResolutionPlan #99 not found');
+
+		$invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+	}
+
+	public function testInvokesZeroArgHandlerAndReturnsResult(): void
+	{
+		$handler = fn (): string => 'hello';
+		$op      = new CompiledOperation(0, 0, 0, 0);
+		$runtime = new CompiledRuntime([], [0 => $handler], [0 => $this->emptyPlan()], [], ['op.a' => $op]);
 		$invoker = new Invoker($runtime);
 
 		$result = $invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
@@ -62,7 +95,7 @@ final class InvokerTest extends TestCase
 		$this->assertSame('hello', $result);
 	}
 
-	public function testHandlerReceivesContext(): void
+	public function testHandlerReceivesContextViaContextInstruction(): void
 	{
 		$ctx      = $this->makeContext();
 		$received = null;
@@ -72,7 +105,7 @@ final class InvokerTest extends TestCase
 		};
 
 		$op      = new CompiledOperation(0, 0, 0, 0);
-		$runtime = new CompiledRuntime([], [0 => $handler], [], [], ['op.a' => $op]);
+		$runtime = new CompiledRuntime([], [0 => $handler], [0 => $this->contextPlan()], [], ['op.a' => $op]);
 		$invoker = new Invoker($runtime);
 
 		$invoker->invoke($this->makeOperation('op.a'), $ctx);
@@ -80,13 +113,39 @@ final class InvokerTest extends TestCase
 		$this->assertSame($ctx, $received);
 	}
 
+	public function testHandlerReceivesServiceViaFactoryInstruction(): void
+	{
+		$instance = new InvokerServiceFixture();
+		$factory  = new CompiledFactory(static fn (): object => $instance);
+		$plan     = new ArgumentResolutionPlan([new FactoryArgumentInstruction($factory)]);
+		$received = null;
+
+		$handler = function (InvokerServiceFixture $svc) use (&$received): void {
+			$received = $svc;
+		};
+
+		$op      = new CompiledOperation(0, 0, 0, 0);
+		$runtime = new CompiledRuntime([], [0 => $handler], [0 => $plan], [], ['op.a' => $op]);
+		$invoker = new Invoker($runtime);
+
+		$invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+
+		$this->assertSame($instance, $received);
+	}
+
 	public function testHandlerIsResolvedByCompiledHandlerId(): void
 	{
-		$wrong  = fn (): string => 'wrong';
-		$right  = fn (): string => 'right';
+		$wrong = fn (): string => 'wrong';
+		$right = fn (): string => 'right';
 
-		$op      = new CompiledOperation(0, 1, 0, 0);
-		$runtime = new CompiledRuntime([], [0 => $wrong, 1 => $right], [], [], ['op.a' => $op]);
+		$op      = new CompiledOperation(0, 1, 1, 0);
+		$runtime = new CompiledRuntime(
+			[],
+			[0 => $wrong, 1 => $right],
+			[0 => $this->emptyPlan(), 1 => $this->emptyPlan()],
+			[],
+			['op.a' => $op],
+		);
 		$invoker = new Invoker($runtime);
 
 		$result = $invoker->invoke($this->makeOperation('op.a'), $this->makeContext());

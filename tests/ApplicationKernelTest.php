@@ -9,6 +9,7 @@ use Rokke\Contracts\Module\ModuleBuilderInterface;
 use Rokke\Contracts\Module\ModuleInterface;
 use Rokke\Runtime\ApplicationKernel;
 use Rokke\Runtime\Build\OperationCapability;
+use Rokke\Runtime\Contracts\OperationContextInterface;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,48 @@ final class ApplicationKernelTest extends TestCase
 
 		$this->expectException(\RuntimeException::class);
 		$kernel->run('no.operation');
+	}
+
+	public function testHandlerReceivesInjectedService(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ModuleInterface {
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$builder->service(KernelServiceFixture::class);
+				$builder->addCapability(new OperationCapability(
+					id: 'inject',
+					name: 'Inject',
+					handler: static function (KernelServiceFixture $svc): string {
+						return 'got:' . $svc::class;
+					},
+				));
+			}
+		});
+		$kernel->build();
+
+		$this->assertSame('got:' . KernelServiceFixture::class, $kernel->run('inject'));
+	}
+
+	public function testHandlerWithBothServiceAndContextReceivesBoth(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ModuleInterface {
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$builder->service(KernelServiceFixture::class);
+				$builder->addCapability(new OperationCapability(
+					id: 'both',
+					name: 'Both',
+					handler: static function (KernelServiceFixture $svc, OperationContextInterface $ctx): string {
+						return 'svc:' . $svc::class . '|ctx';
+					},
+				));
+			}
+		});
+		$kernel->build();
+
+		$this->assertSame('svc:' . KernelServiceFixture::class . '|ctx', $kernel->run('both'));
 	}
 
 	public function testRegisterAccumulatesModulesBeforeBuild(): void
