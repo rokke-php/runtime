@@ -7,7 +7,17 @@ namespace Rokke\Runtime\Tests\Builder;
 use PHPUnit\Framework\TestCase;
 use Rokke\Runtime\Build\ApplicationModel;
 use Rokke\Runtime\Build\OperationDefinition;
+use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Builder\DefaultRuntimeBuilder;
+
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+
+final class BuilderTestDep {}
+
+final class BuilderTestService
+{
+	public function __construct(public readonly BuilderTestDep $dep) {}
+}
 use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Contracts\RuntimeInterface;
@@ -83,6 +93,53 @@ final class DefaultRuntimeBuilderTest extends TestCase
 		$this->expectException(\RuntimeException::class);
 
 		$runtime->execute($this->makeOperation('unknown'), $this->makeContext());
+	}
+
+	public function testBuildWithServiceDescriptorsDoesNotThrow(): void
+	{
+		$model = new ApplicationModel();
+		$model->add(new ServiceDescriptor(DefaultRuntimeBuilder::class, DefaultRuntimeBuilder::class, [DefaultRuntimeBuilder::class]));
+
+		$runtime = $this->builder->build($model);
+
+		$this->assertInstanceOf(RuntimeInterface::class, $runtime);
+	}
+
+	public function testServicesAndOperationsCoexistInBuiltRuntime(): void
+	{
+		$model = new ApplicationModel();
+		$model->add(new OperationDefinition('greet', 'Greet', static fn (): string => 'hello'));
+		$model->add(new ServiceDescriptor(DefaultRuntimeBuilder::class, DefaultRuntimeBuilder::class, [DefaultRuntimeBuilder::class]));
+
+		$runtime = $this->builder->build($model);
+		$result  = $runtime->execute($this->makeOperation('greet'), $this->makeContext());
+
+		$this->assertSame('hello', $result);
+	}
+
+	public function testBuildThrowsWhenServiceDependencyIsNotRegistered(): void
+	{
+		$model = new ApplicationModel();
+		$model->add(new ServiceDescriptor(
+			BuilderTestService::class,
+			BuilderTestService::class,
+			[BuilderTestService::class],
+		));
+
+		$this->expectException(\RuntimeException::class);
+
+		$this->builder->build($model);
+	}
+
+	public function testBuildSucceedsWhenAllDependenciesAreRegistered(): void
+	{
+		$model = new ApplicationModel();
+		$model->add(new ServiceDescriptor(BuilderTestDep::class, BuilderTestDep::class, [BuilderTestDep::class]));
+		$model->add(new ServiceDescriptor(BuilderTestService::class, BuilderTestService::class, [BuilderTestService::class]));
+
+		$runtime = $this->builder->build($model);
+
+		$this->assertInstanceOf(RuntimeInterface::class, $runtime);
 	}
 
 	public function testMultipleOperationsAreIndependentlyExecutable(): void
