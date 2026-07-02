@@ -7,6 +7,7 @@ namespace Rokke\Runtime\Compiled;
 use Rokke\Runtime\Build\CompiledFactory;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
+use Rokke\Runtime\Compiled\Results\ResultResolutionPlan;
 
 /**
  * Immutable in-memory model of the fully compiled application.
@@ -20,7 +21,7 @@ final class CompiledRuntime
 	 * @param array<int, mixed>                $pipelines
 	 * @param array<int, callable>             $handlers
 	 * @param array<int, ArgumentResolutionPlan> $argumentPlans
-	 * @param array<int, mixed>                $resultPlans
+	 * @param array<int, ResultResolutionPlan>  $resultPlans
 	 * @param array<string, CompiledOperation> $operations
 	 */
 	public function __construct(
