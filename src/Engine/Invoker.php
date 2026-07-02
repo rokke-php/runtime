@@ -31,6 +31,12 @@ final readonly class Invoker implements InvokerInterface
 			throw new \RuntimeException("Handler #{$compiled->handlerId} not found in CompiledRuntime.");
 		}
 
-		return $handler($context);
+		$plan = $this->runtime->argumentPlans[$compiled->argumentPlanId] ?? null;
+
+		if ($plan === null) {
+			throw new \RuntimeException("ArgumentResolutionPlan #{$compiled->argumentPlanId} not found in CompiledRuntime.");
+		}
+
+		return $handler(...$plan->resolveAll($context));
 	}
 }
