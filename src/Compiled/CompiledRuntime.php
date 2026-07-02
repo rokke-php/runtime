@@ -4,29 +4,42 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Compiled;
 
+use Rokke\Runtime\Build\CompiledFactory;
+use Rokke\Runtime\Build\FactoryRepository;
+
 /**
  * Immutable in-memory model of the fully compiled application.
  * All shared structures (pipelines, handlers, plans) are stored once and referenced by ID.
  */
-final readonly class CompiledRuntime
+final class CompiledRuntime
 {
+	public readonly FactoryRepository $factories;
+
 	/**
-	 * @param array<int, mixed>   $pipelines
-	 * @param array<int, callable> $handlers
-	 * @param array<int, mixed>   $argumentPlans
-	 * @param array<int, mixed>   $resultPlans
+	 * @param array<int, mixed>                $pipelines
+	 * @param array<int, callable>             $handlers
+	 * @param array<int, mixed>                $argumentPlans
+	 * @param array<int, mixed>                $resultPlans
 	 * @param array<string, CompiledOperation> $operations
 	 */
 	public function __construct(
-		public array $pipelines,
-		public array $handlers,
-		public array $argumentPlans,
-		public array $resultPlans,
-		public array $operations,
-	) {}
+		public readonly array $pipelines,
+		public readonly array $handlers,
+		public readonly array $argumentPlans,
+		public readonly array $resultPlans,
+		public readonly array $operations,
+		?FactoryRepository $factories = null,
+	) {
+		$this->factories = $factories ?? FactoryRepository::empty();
+	}
 
 	public function getOperation(string $id): ?CompiledOperation
 	{
 		return $this->operations[$id] ?? null;
+	}
+
+	public function getService(string $alias): ?CompiledFactory
+	{
+		return $this->factories->get($alias);
 	}
 }

@@ -5,8 +5,18 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Compiled;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Runtime\Build\CompiledFactory;
+use Rokke\Runtime\Build\FactoryCompiler;
+use Rokke\Runtime\Build\FactoryRepository;
+use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
+
+// ── Fixture ───────────────────────────────────────────────────────────────────
+
+final class CompiledRuntimeServiceFixture {}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 final class CompiledRuntimeTest extends TestCase
 {
@@ -35,8 +45,8 @@ final class CompiledRuntimeTest extends TestCase
 
 	public function testMultipleOperationsAreIndependentlyAddressable(): void
 	{
-		$opA = new CompiledOperation(0, 0, 0, 0);
-		$opB = new CompiledOperation(1, 1, 1, 1);
+		$opA     = new CompiledOperation(0, 0, 0, 0);
+		$opB     = new CompiledOperation(1, 1, 1, 1);
 		$runtime = new CompiledRuntime([], [], [], [], [
 			'a' => $opA,
 			'b' => $opB,
@@ -52,5 +62,44 @@ final class CompiledRuntimeTest extends TestCase
 		$runtime = new CompiledRuntime([], [0 => $handler], [], [], []);
 
 		$this->assertSame($handler, $runtime->handlers[0]);
+	}
+
+	public function testFactoriesDefaultsToEmptyRepositoryWhenNotProvided(): void
+	{
+		$runtime = new CompiledRuntime([], [], [], [], []);
+
+		$this->assertInstanceOf(FactoryRepository::class, $runtime->factories);
+		$this->assertNull($runtime->getService(CompiledRuntimeServiceFixture::class));
+	}
+
+	public function testGetServiceReturnsNullForUnknownAlias(): void
+	{
+		$runtime = new CompiledRuntime([], [], [], [], []);
+
+		$this->assertNull($runtime->getService(CompiledRuntimeServiceFixture::class));
+	}
+
+	public function testGetServiceDelegatesToFactoryRepository(): void
+	{
+		$descriptor = new ServiceDescriptor(
+			CompiledRuntimeServiceFixture::class,
+			CompiledRuntimeServiceFixture::class,
+			[CompiledRuntimeServiceFixture::class],
+		);
+		$repo    = FactoryRepository::build([$descriptor], new FactoryCompiler());
+		$runtime = new CompiledRuntime([], [], [], [], [], $repo);
+
+		$factory = $runtime->getService(CompiledRuntimeServiceFixture::class);
+		$this->assertInstanceOf(CompiledFactory::class, $factory);
+		assert($factory instanceof CompiledFactory);
+		$this->assertInstanceOf(CompiledRuntimeServiceFixture::class, $factory->create());
+	}
+
+	public function testExplicitFactoryRepositoryIsStoredOnFactoriesField(): void
+	{
+		$repo    = FactoryRepository::build([], new FactoryCompiler());
+		$runtime = new CompiledRuntime([], [], [], [], [], $repo);
+
+		$this->assertSame($repo, $runtime->factories);
 	}
 }

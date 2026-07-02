@@ -6,6 +6,7 @@ namespace Rokke\Runtime\Module;
 
 use Rokke\Contracts\Module\CapabilityInterface;
 use Rokke\Contracts\Module\ModuleBuilderInterface;
+use Rokke\Runtime\Build\ServiceCapability;
 
 /**
  * Collects capabilities declared by modules during the build phase.
@@ -19,6 +20,11 @@ final class ModuleBuilder implements ModuleBuilderInterface
 	public function addCapability(CapabilityInterface $capability): void
 	{
 		$this->capabilities[] = $capability;
+	}
+
+	public function service(string $contract, ?string $implementation = null): void
+	{
+		$this->addCapability(new ServiceCapability($contract, $implementation));
 	}
 
 	/** @return list<CapabilityInterface> */

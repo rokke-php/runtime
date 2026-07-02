@@ -12,6 +12,8 @@ use Rokke\Runtime\Build\OperationCapability;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
+final class KernelServiceFixture {}
+
 final class GreetModule implements ModuleInterface
 {
 	public function register(ModuleBuilderInterface $builder): void
@@ -75,6 +77,22 @@ final class ApplicationKernelTest extends TestCase
 
 		$this->assertSame('result-a', $kernel->run('op.a'));
 		$this->assertSame('result-b', $kernel->run('op.b'));
+	}
+
+	public function testBuildSucceedsWhenModuleRegistersService(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ModuleInterface {
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$builder->service(KernelServiceFixture::class);
+			}
+		});
+
+		$kernel->build();
+
+		$this->expectException(\RuntimeException::class);
+		$kernel->run('no.operation');
 	}
 
 	public function testRegisterAccumulatesModulesBeforeBuild(): void

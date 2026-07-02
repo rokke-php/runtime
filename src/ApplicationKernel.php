@@ -7,6 +7,7 @@ namespace Rokke\Runtime;
 use Rokke\Contracts\Module\ModuleInterface;
 use Rokke\Runtime\Build\ModelBuilder;
 use Rokke\Runtime\Build\OperationModelBuilderPass;
+use Rokke\Runtime\Build\ServiceModelBuilderPass;
 use Rokke\Runtime\Builder\DefaultRuntimeBuilder;
 use Rokke\Runtime\Context\OperationContext;
 use Rokke\Runtime\Contracts\RuntimeInterface;
@@ -33,7 +34,7 @@ final class ApplicationKernel
 		$moduleBuilder = new ModuleBuilder();
 		$this->modules->buildAll($moduleBuilder);
 
-		$model         = (new ModelBuilder([new OperationModelBuilderPass()]))->build($moduleBuilder->getCapabilities());
+		$model         = (new ModelBuilder([new OperationModelBuilderPass(), new ServiceModelBuilderPass()]))->build($moduleBuilder->getCapabilities());
 		$this->runtime = (new DefaultRuntimeBuilder())->build($model);
 	}
 
