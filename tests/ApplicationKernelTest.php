@@ -138,6 +138,66 @@ final class ApplicationKernelTest extends TestCase
 		$this->assertSame('svc:' . KernelServiceFixture::class . '|ctx', $kernel->run('both'));
 	}
 
+	public function testBuildThrowsForHandlerWithNoReturnType(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ModuleInterface {
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$builder->addCapability(new OperationCapability(
+					id: 'untyped',
+					name: 'Untyped',
+					handler: static fn () => 'no type',
+				));
+			}
+		});
+
+		$this->expectException(\RuntimeException::class);
+		$kernel->build();
+	}
+
+	public function testVoidHandlerReturnsNull(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ModuleInterface {
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$builder->addCapability(new OperationCapability(
+					id: 'void',
+					name: 'Void',
+					handler: static function (): void {},
+				));
+			}
+		});
+		$kernel->build();
+
+		$this->assertNull($kernel->run('void'));
+	}
+
+	public function testHandlerReturningDtoPassesThroughUnmodified(): void
+	{
+		$expected = new KernelServiceFixture();
+		$kernel   = new ApplicationKernel();
+		$kernel->register(new class ($expected) implements ModuleInterface {
+			public function __construct(private readonly KernelServiceFixture $dto) {}
+
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$dto = $this->dto;
+				$builder->addCapability(new OperationCapability(
+					id: 'dto',
+					name: 'DTO',
+					handler: static function () use ($dto): KernelServiceFixture {
+						return $dto;
+					},
+				));
+			}
+		});
+		$kernel->build();
+
+		$this->assertSame($expected, $kernel->run('dto'));
+	}
+
 	public function testRegisterAccumulatesModulesBeforeBuild(): void
 	{
 		$kernel = new ApplicationKernel();
