@@ -1,5 +1,10 @@
 # rokke/runtime
 
+[![CI](https://github.com/rokke-php/runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/rokke-php/runtime/actions/workflows/ci.yml)
+[![Latest Version](https://img.shields.io/github/v/tag/rokke-php/runtime?label=version)](https://github.com/rokke-php/runtime/releases)
+[![PHP](https://img.shields.io/badge/PHP-%3E%3D8.4-8892be)](https://www.php.net)
+[![License](https://img.shields.io/github/license/rokke-php/runtime)](LICENSE)
+
 Persistent, coroutine-driven execution platform built on Swoole. Foundation of the Rokke Framework.
 
 ## What this is
