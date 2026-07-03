@@ -9,13 +9,15 @@ use Rokke\Runtime\Build\CompiledFactory;
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\ServiceDescriptor;
+use Rokke\Runtime\Compiled\ArtifactRepository;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 use Rokke\Runtime\Compiled\OperationRepository;
 
-// ── Fixture ───────────────────────────────────────────────────────────────────
+// ── Fixtures ──────────────────────────────────────────────────────────────────
 
 final class CompiledRuntimeServiceFixture {}
+final class CompiledRuntimeArtifactFixture {}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -104,5 +106,25 @@ final class CompiledRuntimeTest extends TestCase
 		$runtime = new CompiledRuntime([], [], [], [], null, $repo);
 
 		$this->assertSame($repo, $runtime->factories);
+	}
+
+	// ── artifacts field ──────────────────────────────────────────────────────
+
+	public function testArtifactsDefaultsToEmptyRepositoryWhenNotProvided(): void
+	{
+		$runtime = new CompiledRuntime([], [], [], []);
+
+		$this->assertInstanceOf(ArtifactRepository::class, $runtime->artifacts);
+		$this->assertFalse($runtime->artifacts->has(CompiledRuntimeArtifactFixture::class));
+	}
+
+	public function testArtifactsExposesPassedRepository(): void
+	{
+		$artifact = new CompiledRuntimeArtifactFixture();
+		$repo     = ArtifactRepository::build([CompiledRuntimeArtifactFixture::class => $artifact]);
+		$runtime  = new CompiledRuntime([], [], [], [], null, null, $repo);
+
+		$this->assertSame($repo, $runtime->artifacts);
+		$this->assertSame($artifact, $runtime->artifacts->get(CompiledRuntimeArtifactFixture::class));
 	}
 }

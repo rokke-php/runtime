@@ -17,6 +17,7 @@ final class CompiledRuntime
 {
 	public readonly FactoryRepository $factories;
 	public readonly OperationRepository $operations;
+	public readonly ArtifactRepository $artifacts;
 
 	/**
 	 * @param array<int, mixed>                  $pipelines
@@ -31,9 +32,11 @@ final class CompiledRuntime
 		public readonly array $resultPlans,
 		?OperationRepository $operations = null,
 		?FactoryRepository $factories = null,
+		?ArtifactRepository $artifacts = null,
 	) {
 		$this->operations = $operations ?? OperationRepository::empty();
 		$this->factories  = $factories ?? FactoryRepository::empty();
+		$this->artifacts  = $artifacts ?? ArtifactRepository::empty();
 	}
 
 	public function getService(string $alias): ?CompiledFactory
