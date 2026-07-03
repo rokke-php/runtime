@@ -11,6 +11,7 @@ use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\OperationDefinition;
 use Rokke\Runtime\Build\ResultPlanCompiler;
 use Rokke\Runtime\Build\ServiceDescriptor;
+use Rokke\Runtime\Compiled\ArtifactRepository;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 use Rokke\Runtime\Compiled\OperationRepository;
@@ -48,6 +49,7 @@ final class DefaultRuntimeBuilder
 			$resultPlans,
 			OperationRepository::build($compiledOps),
 			$factories,
+			ArtifactRepository::empty(),
 		);
 		$invoker  = new Invoker($compiled);
 
