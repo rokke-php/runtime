@@ -13,6 +13,7 @@ use Rokke\Runtime\Build\ResultPlanCompiler;
 use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
+use Rokke\Runtime\Compiled\OperationRepository;
 use Rokke\Runtime\Contracts\RuntimeInterface;
 use Rokke\Runtime\Engine\ExecutionEngine;
 use Rokke\Runtime\Engine\Invoker;
@@ -31,16 +32,23 @@ final class DefaultRuntimeBuilder
 		$handlers       = [];
 		$argumentPlans  = [];
 		$resultPlans    = [];
-		$operations     = [];
+		$compiledOps    = [];
 
 		foreach ($model->definitions(OperationDefinition::class) as $index => $definition) {
 			$handlers[$index]      = $definition->handler;
 			$argumentPlans[$index] = $argCompiler->compile($definition->handler, $factories);
 			$resultPlans[$index]   = $resultCompiler->compile($definition->handler);
-			$operations[$definition->id] = new CompiledOperation(0, $index, $index, $index);
+			$compiledOps[]         = new CompiledOperation($definition->id, 0, $index, $index, $index);
 		}
 
-		$compiled = new CompiledRuntime([], $handlers, $argumentPlans, $resultPlans, $operations, $factories);
+		$compiled = new CompiledRuntime(
+			[],
+			$handlers,
+			$argumentPlans,
+			$resultPlans,
+			OperationRepository::build($compiledOps),
+			$factories,
+		);
 		$invoker  = new Invoker($compiled);
 
 		return new ExecutionEngine($invoker);

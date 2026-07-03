@@ -19,7 +19,7 @@ final readonly class Invoker implements InvokerInterface
 
 	public function invoke(OperationInterface $operation, OperationContextInterface $context): mixed
 	{
-		$compiled = $this->runtime->getOperation($operation->id());
+		$compiled = $this->runtime->operations->find($operation->id());
 
 		if ($compiled === null) {
 			throw new \RuntimeException("No compiled operation found for id '{$operation->id()}'.");

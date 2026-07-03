@@ -11,6 +11,7 @@ use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
 use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
+use Rokke\Runtime\Compiled\OperationRepository;
 use Rokke\Runtime\Compiled\Results\ResultResolutionPlan;
 use Rokke\Runtime\Compiled\Results\ScalarResultInstruction;
 use Rokke\Runtime\Compiled\Results\VoidResultInstruction;
@@ -61,7 +62,7 @@ final class InvokerTest extends TestCase
 
 	public function testThrowsWhenOperationIdNotFound(): void
 	{
-		$runtime = new CompiledRuntime([], [], [], [], []);
+		$runtime = new CompiledRuntime([], [], [], []);
 		$invoker = new Invoker($runtime);
 
 		$this->expectException(\RuntimeException::class);
@@ -72,13 +73,13 @@ final class InvokerTest extends TestCase
 
 	public function testThrowsWhenHandlerIdNotInRuntime(): void
 	{
-		$op      = new CompiledOperation(0, 99, 0, 0);
+		$op      = new CompiledOperation('op.a', 0, 99, 0, 0);
 		$runtime = new CompiledRuntime(
 			[],
 			[],
 			[0 => $this->emptyArgPlan()],
 			[0 => $this->stringResultPlan()],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 
@@ -91,13 +92,13 @@ final class InvokerTest extends TestCase
 	public function testThrowsWhenArgumentPlanNotFound(): void
 	{
 		$handler = fn (): string => 'ok';
-		$op      = new CompiledOperation(0, 0, 99, 0);
+		$op      = new CompiledOperation('op.a', 0, 0, 99, 0);
 		$runtime = new CompiledRuntime(
 			[],
 			[0 => $handler],
 			[],
 			[0 => $this->stringResultPlan()],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 
@@ -110,13 +111,13 @@ final class InvokerTest extends TestCase
 	public function testThrowsWhenResultPlanNotFound(): void
 	{
 		$handler = fn (): string => 'ok';
-		$op      = new CompiledOperation(0, 0, 0, 99);
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 99);
 		$runtime = new CompiledRuntime(
 			[],
 			[0 => $handler],
 			[0 => $this->emptyArgPlan()],
 			[],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 
@@ -129,13 +130,13 @@ final class InvokerTest extends TestCase
 	public function testInvokesZeroArgHandlerAndReturnsResult(): void
 	{
 		$handler = fn (): string => 'hello';
-		$op      = new CompiledOperation(0, 0, 0, 0);
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 0);
 		$runtime = new CompiledRuntime(
 			[],
 			[0 => $handler],
 			[0 => $this->emptyArgPlan()],
 			[0 => $this->stringResultPlan()],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 
@@ -153,13 +154,13 @@ final class InvokerTest extends TestCase
 			$received = $c;
 		};
 
-		$op      = new CompiledOperation(0, 0, 0, 0);
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 0);
 		$runtime = new CompiledRuntime(
 			[],
 			[0 => $handler],
 			[0 => $this->contextArgPlan()],
 			[0 => $this->voidResultPlan()],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 
@@ -179,13 +180,13 @@ final class InvokerTest extends TestCase
 			$received = $svc;
 		};
 
-		$op      = new CompiledOperation(0, 0, 0, 0);
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 0);
 		$runtime = new CompiledRuntime(
 			[],
 			[0 => $handler],
 			[0 => $argPlan],
 			[0 => $this->voidResultPlan()],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 
@@ -199,13 +200,13 @@ final class InvokerTest extends TestCase
 		$wrong = fn (): string => 'wrong';
 		$right = fn (): string => 'right';
 
-		$op      = new CompiledOperation(0, 1, 1, 1);
+		$op      = new CompiledOperation('op.a', 0, 1, 1, 1);
 		$runtime = new CompiledRuntime(
 			[],
 			[0 => $wrong, 1 => $right],
 			[0 => $this->emptyArgPlan(), 1 => $this->emptyArgPlan()],
 			[0 => $this->stringResultPlan(), 1 => $this->stringResultPlan()],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 
@@ -217,14 +218,14 @@ final class InvokerTest extends TestCase
 	public function testResultPlanIsApplied(): void
 	{
 		$handler    = fn (): string => 'raw';
-		$op         = new CompiledOperation(0, 0, 0, 0);
+		$op         = new CompiledOperation('op.a', 0, 0, 0, 0);
 		$resultPlan = new ResultResolutionPlan(new ScalarResultInstruction('string'));
 		$runtime    = new CompiledRuntime(
 			[],
 			[0 => $handler],
 			[0 => $this->emptyArgPlan()],
 			[0 => $resultPlan],
-			['op.a' => $op],
+			OperationRepository::build([$op]),
 		);
 		$invoker = new Invoker($runtime);
 

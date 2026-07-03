@@ -16,28 +16,24 @@ use Rokke\Runtime\Compiled\Results\ResultResolutionPlan;
 final class CompiledRuntime
 {
 	public readonly FactoryRepository $factories;
+	public readonly OperationRepository $operations;
 
 	/**
-	 * @param array<int, mixed>                $pipelines
-	 * @param array<int, callable>             $handlers
+	 * @param array<int, mixed>                  $pipelines
+	 * @param array<int, callable>               $handlers
 	 * @param array<int, ArgumentResolutionPlan> $argumentPlans
-	 * @param array<int, ResultResolutionPlan>  $resultPlans
-	 * @param array<string, CompiledOperation> $operations
+	 * @param array<int, ResultResolutionPlan>   $resultPlans
 	 */
 	public function __construct(
 		public readonly array $pipelines,
 		public readonly array $handlers,
 		public readonly array $argumentPlans,
 		public readonly array $resultPlans,
-		public readonly array $operations,
+		?OperationRepository $operations = null,
 		?FactoryRepository $factories = null,
 	) {
-		$this->factories = $factories ?? FactoryRepository::empty();
-	}
-
-	public function getOperation(string $id): ?CompiledOperation
-	{
-		return $this->operations[$id] ?? null;
+		$this->operations = $operations ?? OperationRepository::empty();
+		$this->factories  = $factories ?? FactoryRepository::empty();
 	}
 
 	public function getService(string $alias): ?CompiledFactory
