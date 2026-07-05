@@ -17,5 +17,6 @@ final readonly class CompiledOperation
 		public int $handlerId,
 		public int $argumentPlanId,
 		public int $resultPlanId,
+		public int $interceptorChainId = 0,
 	) {}
 }
