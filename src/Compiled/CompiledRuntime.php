@@ -20,7 +20,7 @@ final class CompiledRuntime
 	public readonly ArtifactRepository $artifacts;
 
 	/**
-	 * @param array<int, mixed>                  $pipelines
+	 * @param array<int, CompiledPipeline>       $pipelines
 	 * @param array<int, callable>               $handlers
 	 * @param array<int, ArgumentResolutionPlan> $argumentPlans
 	 * @param array<int, ResultResolutionPlan>   $resultPlans

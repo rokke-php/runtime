@@ -5,10 +5,18 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Engine;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
+use Rokke\Runtime\Compiled\CompiledOperation;
+use Rokke\Runtime\Compiled\CompiledPipeline;
+use Rokke\Runtime\Compiled\CompiledRuntime;
+use Rokke\Runtime\Compiled\OperationRepository;
+use Rokke\Runtime\Compiled\Results\ResultResolutionPlan;
+use Rokke\Runtime\Compiled\Results\ScalarResultInstruction;
 use Rokke\Runtime\Contracts\InvokerInterface;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Engine\ExecutionEngine;
+use Rokke\Runtime\Engine\Invoker;
 
 final class ExecutionEngineTest extends TestCase
 {
@@ -142,5 +150,116 @@ final class ExecutionEngineTest extends TestCase
 		$result = $engine->execute($this->makeOperation(), $this->makeContext());
 
 		$this->assertSame(42, $result);
+	}
+
+	// ── Compiled pipeline path ────────────────────────────────────────────────
+
+	/** @param list<callable(OperationInterface, OperationContextInterface, callable): mixed> $stages */
+	private function makeCompiledRuntime(string $opId, array $stages): CompiledRuntime
+	{
+		$op = new CompiledOperation(
+			id: $opId,
+			pipelineId: 0,
+			handlerId: 0,
+			argumentPlanId: 0,
+			resultPlanId: 0,
+		);
+
+		$handler      = static fn (): string => 'core';
+		$argPlan      = new ArgumentResolutionPlan([]);
+		$resultPlan   = new ResultResolutionPlan(new ScalarResultInstruction('string'));
+		$pipeline     = new CompiledPipeline($stages);
+		$operations   = OperationRepository::build([$op]);
+
+		return new CompiledRuntime(
+			pipelines: [0 => $pipeline],
+			handlers: [0 => $handler],
+			argumentPlans: [0 => $argPlan],
+			resultPlans: [0 => $resultPlan],
+			operations: $operations,
+		);
+	}
+
+	private function makeRealOperation(string $id): OperationInterface
+	{
+		$op = $this->createStub(OperationInterface::class);
+		$op->method('id')->willReturn($id);
+
+		return $op;
+	}
+
+	public function testCompiledPipelineStagesRunAroundInvoker(): void
+	{
+		$order   = [];
+		$stage   = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
+			$order[] = 'before';
+			$result  = $next();
+			$order[] = 'after';
+
+			return $result;
+		};
+
+		$runtime = $this->makeCompiledRuntime('greet', [$stage]);
+		$engine  = new ExecutionEngine(new Invoker($runtime), runtime: $runtime);
+
+		$engine->execute($this->makeRealOperation('greet'), $this->makeContext());
+
+		$this->assertSame(['before', 'after'], $order);
+	}
+
+	public function testCompiledPipelineEmptyRunsCoreDirectly(): void
+	{
+		$runtime = $this->makeCompiledRuntime('greet', []);
+		$engine  = new ExecutionEngine(new Invoker($runtime), runtime: $runtime);
+
+		$result = $engine->execute($this->makeRealOperation('greet'), $this->makeContext());
+
+		$this->assertSame('core', $result);
+	}
+
+	public function testCompiledPipelineStagesRunOutermostFirst(): void
+	{
+		$order = [];
+
+		$first = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
+			$order[] = 'first';
+			$result  = $next();
+			$order[] = 'first-after';
+
+			return $result;
+		};
+
+		$second = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
+			$order[] = 'second';
+			$result  = $next();
+			$order[] = 'second-after';
+
+			return $result;
+		};
+
+		$runtime = $this->makeCompiledRuntime('greet', [$first, $second]);
+		$engine  = new ExecutionEngine(new Invoker($runtime), runtime: $runtime);
+
+		$engine->execute($this->makeRealOperation('greet'), $this->makeContext());
+
+		$this->assertSame(['first', 'second', 'second-after', 'first-after'], $order);
+	}
+
+	public function testGlobalMiddlewaresUsedWhenNoRuntime(): void
+	{
+		$ran     = false;
+		$invoker = $this->createStub(InvokerInterface::class);
+		$invoker->method('invoke')->willReturn('ok');
+
+		$mw     = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$ran): mixed {
+			$ran = true;
+
+			return $next();
+		};
+
+		$engine = new ExecutionEngine($invoker, [$mw]);
+		$engine->execute($this->makeOperation(), $this->makeContext());
+
+		$this->assertTrue($ran);
 	}
 }
