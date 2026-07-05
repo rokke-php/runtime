@@ -18,6 +18,9 @@ final class ResultPlanCompiler
 {
 	private const SCALAR_TYPES = ['string', 'int', 'float', 'bool', 'array'];
 
+	/** @param ResultSourceCompilerInterface[] $sources */
+	public function __construct(private readonly array $sources = []) {}
+
 	public function compile(callable $handler): ResultResolutionPlan
 	{
 		$reflection = new ReflectionFunction(\Closure::fromCallable($handler));
@@ -45,6 +48,14 @@ final class ResultPlanCompiler
 			throw new \RuntimeException(
 				"Return type 'mixed' is not allowed as an Output Contract. Declare a specific type so the Build can validate and compile the result pipeline.",
 			);
+		}
+
+		foreach ($this->sources as $source) {
+			$instruction = $source->compile($returnType);
+
+			if ($instruction !== null) {
+				return new ResultResolutionPlan($instruction);
+			}
 		}
 
 		if ($typeName === 'void') {
