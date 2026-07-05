@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Contracts\Module\CapabilityInterface;
+use Rokke\Contracts\Module\DiscoveryProviderInterface;
 use Rokke\Contracts\Module\ModuleBuilderInterface;
 use Rokke\Contracts\Module\ModuleInterface;
 use Rokke\Runtime\ApplicationKernel;
@@ -196,6 +198,52 @@ final class ApplicationKernelTest extends TestCase
 		$kernel->build();
 
 		$this->assertSame($expected, $kernel->run('dto'));
+	}
+
+	public function testDiscoveredCapabilitiesAreCompiledAndRunnable(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ModuleInterface {
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$builder->addDiscoveryProvider(new class () implements DiscoveryProviderInterface {
+					/** @return list<CapabilityInterface> */
+					public function discover(): array
+					{
+						return [
+							new OperationCapability('discovered.op', 'Discovered', static fn (): string => 'from-discovery'),
+						];
+					}
+				});
+			}
+		});
+		$kernel->build();
+
+		$this->assertSame('from-discovery', $kernel->run('discovered.op'));
+	}
+
+	public function testDiscoveredAndExplicitCapabilitiesCoexist(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ModuleInterface {
+			public function register(ModuleBuilderInterface $builder): void
+			{
+				$builder->addCapability(new OperationCapability('explicit.op', 'Explicit', static fn (): string => 'explicit'));
+				$builder->addDiscoveryProvider(new class () implements DiscoveryProviderInterface {
+					/** @return list<CapabilityInterface> */
+					public function discover(): array
+					{
+						return [
+							new OperationCapability('auto.op', 'Auto', static fn (): string => 'auto'),
+						];
+					}
+				});
+			}
+		});
+		$kernel->build();
+
+		$this->assertSame('explicit', $kernel->run('explicit.op'));
+		$this->assertSame('auto', $kernel->run('auto.op'));
 	}
 
 	public function testRegisterAccumulatesModulesBeforeBuild(): void

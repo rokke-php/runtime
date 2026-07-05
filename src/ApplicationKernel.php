@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rokke\Runtime;
 
 use Rokke\Contracts\Module\ModuleInterface;
+use Rokke\Runtime\Build\DiscoveryEngine;
 use Rokke\Runtime\Build\ModelBuilder;
 use Rokke\Runtime\Build\OperationModelBuilderPass;
 use Rokke\Runtime\Build\ServiceModelBuilderPass;
@@ -34,7 +35,11 @@ final class ApplicationKernel
 		$moduleBuilder = new ModuleBuilder();
 		$this->modules->buildAll($moduleBuilder);
 
-		$model         = (new ModelBuilder([new OperationModelBuilderPass(), new ServiceModelBuilderPass()]))->build($moduleBuilder->getCapabilities());
+		$discovered = (new DiscoveryEngine())->run($moduleBuilder->getDiscoveryProviders());
+
+		$allCapabilities = [...$moduleBuilder->getCapabilities(), ...$discovered];
+
+		$model         = (new ModelBuilder([new OperationModelBuilderPass(), new ServiceModelBuilderPass()]))->build($allCapabilities);
 		$this->runtime = (new DefaultRuntimeBuilder())->build($model);
 	}
 
