@@ -43,8 +43,14 @@ final readonly class Invoker implements InvokerInterface
 			throw new \RuntimeException("ResultResolutionPlan #{$compiled->resultPlanId} not found in CompiledRuntime.");
 		}
 
-		$resolvedArgs = $argumentPlan->resolveAll($context);
-		$core         = fn (array $args): mixed => $resultPlan->resolve($handler(...$args));
+		$resolvedArgs   = $argumentPlan->resolveAll($context);
+		$validationPlan = $this->runtime->validationPlans[$compiled->validationPlanId] ?? null;
+
+		if ($validationPlan !== null && !$validationPlan->isEmpty()) {
+			$validationPlan->validate($resolvedArgs);
+		}
+
+		$core = fn (array $args): mixed => $resultPlan->resolve($handler(...$args));
 
 		$chain = $this->runtime->interceptorChains[$compiled->interceptorChainId] ?? null;
 

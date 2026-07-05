@@ -368,4 +368,86 @@ final class InvokerTest extends TestCase
 
 		$this->assertSame(['first-before', 'second-before', 'second-after', 'first-after'], $order);
 	}
+
+	// ── Validation plan tests ─────────────────────────────────────────────────
+
+	public function testValidationPlanRunsBeforeHandler(): void
+	{
+		$handlerCalled = false;
+		$handler       = function () use (&$handlerCalled): string {
+			$handlerCalled = true;
+
+			return 'core';
+		};
+
+		$validated   = null;
+		$fakePlan    = new \Rokke\Runtime\Compiled\ValidationPlan([
+			new \Rokke\Runtime\Compiled\ParameterValidationPlan(
+				index: 0,
+				name: 'unused',
+				instructions: [
+					new class () implements \Rokke\Runtime\Build\ValidationInstructionInterface {
+						public mixed $received = null;
+
+						public function validate(mixed $value, string $paramName): void
+						{
+							$this->received = $value;
+						}
+					},
+				],
+			),
+		]);
+
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 0, validationPlanId: 0);
+		$runtime = new CompiledRuntime(
+			[],
+			[0 => $handler],
+			[0 => $this->emptyArgPlan()],
+			[0 => $this->stringResultPlan()],
+			OperationRepository::build([$op]),
+			validationPlans: [0 => $fakePlan],
+		);
+
+		$invoker = new Invoker($runtime);
+		$invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+
+		$this->assertTrue($handlerCalled);
+	}
+
+	public function testValidationExceptionPreventsHandlerCall(): void
+	{
+		$handlerCalled = false;
+		$handler       = function () use (&$handlerCalled): string {
+			$handlerCalled = true;
+
+			return 'core';
+		};
+
+		$throwingInstruction = new class () implements \Rokke\Runtime\Build\ValidationInstructionInterface {
+			public function validate(mixed $value, string $paramName): void
+			{
+				throw new \Rokke\Runtime\Exception\ValidationException($paramName, 'must not be blank');
+			}
+		};
+
+		$plan    = new \Rokke\Runtime\Compiled\ValidationPlan([
+			new \Rokke\Runtime\Compiled\ParameterValidationPlan(0, 'name', [$throwingInstruction]),
+		]);
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 0, validationPlanId: 0);
+		$runtime = new CompiledRuntime(
+			[],
+			[0 => $handler],
+			[0 => $this->emptyArgPlan()],
+			[0 => $this->stringResultPlan()],
+			OperationRepository::build([$op]),
+			validationPlans: [0 => $plan],
+		);
+
+		$invoker = new Invoker($runtime);
+
+		$this->expectException(\Rokke\Runtime\Exception\ValidationException::class);
+		$invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+
+		$this->assertFalse($handlerCalled);
+	}
 }
