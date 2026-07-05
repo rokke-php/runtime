@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Runtime\Resource\PoolConfig;
 use Rokke\Runtime\ResourcePool;
 use RuntimeException;
 
@@ -17,20 +18,18 @@ final class ResourcePoolTest extends TestCase
 		}
 	}
 
-	private function makePool(int $min = 0, int $max = 3, int $timeout = 1000): ResourcePool
+	private function makePool(int $min = 0, int $max = 3, int $acquireTimeout = 1000): ResourcePool
 	{
 		$counter = 0;
 
 		return new ResourcePool(
-			name: 'test',
+			config: new PoolConfig('test', min: $min, max: $max, acquireTimeout: $acquireTimeout),
 			factory: function () use (&$counter): \stdClass {
-				$obj      = new \stdClass();
-				$obj->id  = ++$counter;
+				$obj     = new \stdClass();
+				$obj->id = ++$counter;
+
 				return $obj;
 			},
-			min: $min,
-			max: $max,
-			timeout: $timeout,
 		);
 	}
 
@@ -85,7 +84,7 @@ final class ResourcePoolTest extends TestCase
 		$exception = null;
 
 		\Swoole\Coroutine\run(function () use (&$exception): void {
-			$pool = $this->makePool(max: 1, timeout: 50);
+			$pool = $this->makePool(max: 1, acquireTimeout: 50);
 			$pool->get(); // exhausts the pool
 
 			try {
@@ -104,15 +103,15 @@ final class ResourcePoolTest extends TestCase
 		$stats = null;
 
 		\Swoole\Coroutine\run(function () use (&$stats): void {
-			$pool = $this->makePool(min: 2, max: 5);
+			$pool  = $this->makePool(min: 2, max: 5);
 			$stats = $pool->stats();
 		});
 
-		$this->assertSame('test', $stats['name']);
-		$this->assertSame(5, $stats['max']);
-		$this->assertSame(2, $stats['min']);
-		$this->assertSame(2, $stats['current_total']);
-		$this->assertSame(2, $stats['idle']);
+		$this->assertSame('test', $stats->name);
+		$this->assertSame(5, $stats->max);
+		$this->assertSame(2, $stats->min);
+		$this->assertSame(2, $stats->currentTotal);
+		$this->assertSame(2, $stats->idle);
 	}
 
 	public function testMinResourcesCreatedOnConstruction(): void
@@ -124,7 +123,7 @@ final class ResourcePoolTest extends TestCase
 			$stats = $pool->stats();
 		});
 
-		$this->assertSame(3, $stats['current_total']);
+		$this->assertSame(3, $stats->currentTotal);
 	}
 
 	public function testPoolNameIsPreserved(): void
@@ -132,7 +131,10 @@ final class ResourcePoolTest extends TestCase
 		$name = null;
 
 		\Swoole\Coroutine\run(function () use (&$name): void {
-			$pool = new ResourcePool('connections', fn () => new \stdClass(), 0, 5, 1000);
+			$pool = new ResourcePool(
+				config: new PoolConfig('connections', max: 5),
+				factory: fn () => new \stdClass(),
+			);
 			$name = $pool->name;
 		});
 

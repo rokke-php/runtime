@@ -53,7 +53,10 @@ final class ServiceContainer implements ServiceContainerInterface
 		}
 
 		$poolName = "pool_{$id}";
-		$this->resourceManager->registerPool($poolName, $factory, $min, $max, 5000);
+		$this->resourceManager->register(
+			new \Rokke\Runtime\Resource\PoolConfig($poolName, min: $min, max: $max),
+			$factory,
+		);
 		$this->bindings[$id] = ['lifetime' => Lifetime::Pooled, 'concrete' => $poolName];
 	}
 

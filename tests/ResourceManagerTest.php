@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Runtime\Resource\PoolConfig;
 use Rokke\Runtime\ResourceManager;
 use RuntimeException;
 
@@ -17,9 +18,9 @@ final class ResourceManagerTest extends TestCase
 		$this->manager = new ResourceManager();
 	}
 
-	public function testStatsOnEmptyManagerReturnsEmptyArray(): void
+	public function testAllStatsOnEmptyManagerReturnsEmptyArray(): void
 	{
-		$this->assertSame([], $this->manager->stats());
+		$this->assertSame([], $this->manager->allStats());
 	}
 
 	public function testThrowsWhenRegisteringDuplicatePool(): void
@@ -28,12 +29,13 @@ final class ResourceManagerTest extends TestCase
 			$this->markTestSkipped('Swoole extension is required for pool tests.');
 		}
 
-		$this->manager->registerPool('db', fn () => new \stdClass(), 0, 5, 1000);
+		$config = new PoolConfig('db', max: 5);
+		$this->manager->register($config, fn () => new \stdClass());
 
 		$this->expectException(RuntimeException::class);
 		$this->expectExceptionMessage('pool [db] is already registered');
 
-		$this->manager->registerPool('db', fn () => new \stdClass(), 0, 5, 1000);
+		$this->manager->register($config, fn () => new \stdClass());
 	}
 
 	public function testAcquireThrowsForUnknownPool(): void
@@ -64,7 +66,7 @@ final class ResourceManagerTest extends TestCase
 			$this->markTestSkipped('Swoole extension is required for pool tests.');
 		}
 
-		$this->manager->registerPool('cache', fn () => new \stdClass(), 0, 2, 1000);
+		$this->manager->register(new PoolConfig('cache', max: 2), fn () => new \stdClass());
 
 		$this->manager->closeAll();
 
