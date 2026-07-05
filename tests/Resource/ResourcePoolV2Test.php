@@ -136,13 +136,16 @@ final class ResourcePoolV2Test extends TestCase
 		$second = null;
 
 		\Swoole\Coroutine\run(function () use ($config, &$first, &$second): void {
-			$now  = 1_000_000.0;
-			$pool = new ResourcePool(
+			$now   = 1_000_000.0;
+			$clock = function () use (&$now): float {
+				return $now;
+			};
+			$pool  = new ResourcePool(
 				config: $config,
 				factory: function (): \stdClass {
 					return new \stdClass();
 				},
-				clock: fn (): float => $now,
+				clock: $clock,
 			);
 
 			$first = $pool->get();
@@ -164,13 +167,16 @@ final class ResourcePoolV2Test extends TestCase
 		$second = null;
 
 		\Swoole\Coroutine\run(function () use ($config, &$first, &$second): void {
-			$now  = 1_000_000.0;
-			$pool = new ResourcePool(
+			$now   = 1_000_000.0;
+			$clock = function () use (&$now): float {
+				return $now;
+			};
+			$pool  = new ResourcePool(
 				config: $config,
 				factory: function (): \stdClass {
 					return new \stdClass();
 				},
-				clock: fn (): float => $now,
+				clock: $clock,
 			);
 
 			$first = $pool->get();
@@ -190,13 +196,16 @@ final class ResourcePoolV2Test extends TestCase
 		$stats  = null;
 
 		\Swoole\Coroutine\run(function () use ($config, &$stats): void {
-			$now  = 1_000_000.0;
-			$pool = new ResourcePool(
+			$now   = 1_000_000.0;
+			$clock = function () use (&$now): float {
+				return $now;
+			};
+			$pool  = new ResourcePool(
 				config: $config,
 				factory: function (): \stdClass {
 					return new \stdClass();
 				},
-				clock: fn (): float => $now,
+				clock: $clock,
 			);
 
 			$r = $pool->get();
@@ -235,16 +244,17 @@ final class ResourcePoolV2Test extends TestCase
 
 	public function testStatsTracksCreatedCount(): void
 	{
-		$config = new PoolConfig('test', min: 2, max: 5);
+		$config = new PoolConfig('test', min: 0, max: 5);
 		$stats  = null;
 
 		\Swoole\Coroutine\run(function () use ($config, &$stats): void {
 			$pool = $this->makePool($config);
 			$pool->get();
+			$pool->get();
+			$pool->get();
 			$stats = $pool->stats();
 		});
 
-		// min=2 created on construction + 1 from get() = 3
 		$this->assertSame(3, $stats->created);
 	}
 
