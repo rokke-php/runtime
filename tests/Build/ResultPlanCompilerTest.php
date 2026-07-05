@@ -5,15 +5,38 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Build;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionNamedType;
 use Rokke\Runtime\Build\ResultPlanCompiler;
+use Rokke\Runtime\Build\ResultSourceCompilerInterface;
 use Rokke\Runtime\Compiled\Results\NeverResultInstruction;
 use Rokke\Runtime\Compiled\Results\ObjectResultInstruction;
+use Rokke\Runtime\Compiled\Results\ResultInstructionInterface;
 use Rokke\Runtime\Compiled\Results\ScalarResultInstruction;
 use Rokke\Runtime\Compiled\Results\VoidResultInstruction;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 final class ResultPlanDto {}
+
+final class StubResultInstruction implements ResultInstructionInterface
+{
+	public function resolve(mixed $value): mixed
+	{
+		return 'stub';
+	}
+}
+
+final class StubResultSourceCompiler implements ResultSourceCompilerInterface
+{
+	public function compile(ReflectionNamedType $type): ?ResultInstructionInterface
+	{
+		if ($type->getName() === ResultPlanDto::class) {
+			return new StubResultInstruction();
+		}
+
+		return null;
+	}
+}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -137,6 +160,35 @@ final class ResultPlanCompilerTest extends TestCase
 			return 'x';
 		};
 		$this->compiler->compile($fn);
+	}
+
+	// ── Custom sources ────────────────────────────────────────────────────────
+
+	public function testCustomSourceOverridesObjectInstruction(): void
+	{
+		$compiler = new ResultPlanCompiler([new StubResultSourceCompiler()]);
+		$dto      = new ResultPlanDto();
+
+		$plan = $compiler->compile(static fn (): ResultPlanDto => $dto);
+
+		$this->assertInstanceOf(StubResultInstruction::class, $plan->instruction);
+		$this->assertSame('stub', $plan->resolve($dto));
+	}
+
+	public function testCustomSourceReturningNullFallsThroughToBuiltin(): void
+	{
+		$compiler = new ResultPlanCompiler([new StubResultSourceCompiler()]);
+
+		$plan = $compiler->compile(static fn (): string => 'ok');
+
+		$this->assertInstanceOf(ScalarResultInstruction::class, $plan->instruction);
+	}
+
+	public function testDefaultCompilerStillWorksWithNoSources(): void
+	{
+		$plan = $this->compiler->compile(static fn (): ResultPlanDto => new ResultPlanDto());
+
+		$this->assertInstanceOf(ObjectResultInstruction::class, $plan->instruction);
 	}
 
 	// ── Plan resolution ───────────────────────────────────────────────────────
