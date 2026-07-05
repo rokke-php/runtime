@@ -9,6 +9,7 @@ use Rokke\Runtime\Build\CompiledFactory;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
 use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
 use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
+use Rokke\Runtime\Compiled\CompiledInterceptorChain;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 use Rokke\Runtime\Compiled\OperationRepository;
@@ -232,5 +233,139 @@ final class InvokerTest extends TestCase
 		$result = $invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
 
 		$this->assertSame('raw', $result);
+	}
+
+	// ── Interceptor chain tests ───────────────────────────────────────────────
+
+	private function makeRuntimeWithChain(CompiledInterceptorChain $chain): CompiledRuntime
+	{
+		$handler = fn (): string => 'core';
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 0, interceptorChainId: 0);
+
+		return new CompiledRuntime(
+			[],
+			[0 => $handler],
+			[0 => $this->emptyArgPlan()],
+			[0 => $this->stringResultPlan()],
+			OperationRepository::build([$op]),
+			interceptorChains: [0 => $chain],
+		);
+	}
+
+	public function testEmptyInterceptorChainRunsHandlerDirectly(): void
+	{
+		$runtime = $this->makeRuntimeWithChain(CompiledInterceptorChain::empty());
+		$invoker = new Invoker($runtime);
+
+		$result = $invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+
+		$this->assertSame('core', $result);
+	}
+
+	public function testSingleInterceptorFiresAroundHandler(): void
+	{
+		$fired = false;
+
+		$stage = function (OperationInterface $op, OperationContextInterface $ctx, array $args, callable $next) use (&$fired): mixed {
+			$fired = true;
+
+			return $next($args);
+		};
+
+		$chain   = new CompiledInterceptorChain([$stage]);
+		$runtime = $this->makeRuntimeWithChain($chain);
+		$invoker = new Invoker($runtime);
+
+		$result = $invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+
+		$this->assertTrue($fired);
+		$this->assertSame('core', $result);
+	}
+
+	public function testInterceptorCanModifyArgs(): void
+	{
+		$handler = fn (string $name): string => "hello:{$name}";
+		$op      = new CompiledOperation('op.b', 0, 0, 0, 0, interceptorChainId: 0);
+
+		$argInstruction = new class () implements \Rokke\Runtime\Compiled\Arguments\ArgumentInstructionInterface {
+			public function resolve(\Rokke\Runtime\Contracts\OperationContextInterface $ctx): string
+			{
+				return 'original';
+			}
+		};
+
+		$runtime = new CompiledRuntime(
+			[],
+			[0 => $handler],
+			[0 => new ArgumentResolutionPlan([$argInstruction])],
+			[0 => $this->stringResultPlan()],
+			OperationRepository::build([$op]),
+			interceptorChains: [0 => new CompiledInterceptorChain([
+				fn (OperationInterface $op, OperationContextInterface $ctx, array $args, callable $next): mixed =>
+					$next(array_map(fn (mixed $a): string => 'modified', $args)),
+			])],
+		);
+
+		$invoker = new Invoker($runtime);
+		$result  = $invoker->invoke($this->makeOperation('op.b'), $this->makeContext());
+
+		$this->assertSame('hello:modified', $result);
+	}
+
+	public function testInterceptorCanShortCircuit(): void
+	{
+		$handlerCalled = false;
+		$handler       = function () use (&$handlerCalled): string {
+			$handlerCalled = true;
+
+			return 'core';
+		};
+
+		$op      = new CompiledOperation('op.a', 0, 0, 0, 0, interceptorChainId: 0);
+		$runtime = new CompiledRuntime(
+			[],
+			[0 => $handler],
+			[0 => $this->emptyArgPlan()],
+			[0 => $this->stringResultPlan()],
+			OperationRepository::build([$op]),
+			interceptorChains: [0 => new CompiledInterceptorChain([
+				fn (OperationInterface $op, OperationContextInterface $ctx, array $args, callable $next): string => 'short-circuit',
+			])],
+		);
+
+		$invoker = new Invoker($runtime);
+		$result  = $invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+
+		$this->assertFalse($handlerCalled);
+		$this->assertSame('short-circuit', $result);
+	}
+
+	public function testInterceptorsRunOutermostFirst(): void
+	{
+		$order = [];
+
+		$first = function (OperationInterface $op, OperationContextInterface $ctx, array $args, callable $next) use (&$order): mixed {
+			$order[] = 'first-before';
+			$result  = $next($args);
+			$order[] = 'first-after';
+
+			return $result;
+		};
+
+		$second = function (OperationInterface $op, OperationContextInterface $ctx, array $args, callable $next) use (&$order): mixed {
+			$order[] = 'second-before';
+			$result  = $next($args);
+			$order[] = 'second-after';
+
+			return $result;
+		};
+
+		$chain   = new CompiledInterceptorChain([$first, $second]);
+		$runtime = $this->makeRuntimeWithChain($chain);
+		$invoker = new Invoker($runtime);
+
+		$invoker->invoke($this->makeOperation('op.a'), $this->makeContext());
+
+		$this->assertSame(['first-before', 'second-before', 'second-after', 'first-after'], $order);
 	}
 }
