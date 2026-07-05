@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Build;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionNamedType;
+use ReflectionParameter;
 use Rokke\Runtime\Build\ArgumentPlanCompiler;
+use Rokke\Runtime\Build\ArgumentSourceCompilerInterface;
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\ServiceDescriptor;
+use Rokke\Runtime\Compiled\Arguments\ArgumentInstructionInterface;
 use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
 use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
 use Rokke\Runtime\Contracts\OperationContextInterface;
@@ -121,6 +125,95 @@ final class ArgumentPlanCompilerTest extends TestCase
 			static fn (string $name): string => 'ok',
 			$this->emptyRepo,
 		);
+	}
+
+	public function testCustomSourceCanResolveBuiltinType(): void
+	{
+		$instruction = new class () implements ArgumentInstructionInterface {
+			public function resolve(OperationContextInterface $context): mixed
+			{
+				return 'custom';
+			}
+		};
+
+		$source = new class ($instruction) implements ArgumentSourceCompilerInterface {
+			public function __construct(private readonly ArgumentInstructionInterface $instr) {}
+
+			public function compile(ReflectionParameter $param, FactoryRepository $factories): ?ArgumentInstructionInterface
+			{
+				$type = $param->getType();
+
+				return $type instanceof ReflectionNamedType && $type->getName() === 'string'
+					? $this->instr
+					: null;
+			}
+		};
+
+		$compiler = new ArgumentPlanCompiler([$source]);
+		$plan     = $compiler->compile(static fn (string $name): string => $name, $this->emptyRepo);
+
+		$this->assertCount(1, $plan->instructions);
+		$this->assertSame($instruction, $plan->instructions[0]);
+	}
+
+	public function testCustomSourceReturningNullFallsThroughToDefaults(): void
+	{
+		$source = new class () implements ArgumentSourceCompilerInterface {
+			public function compile(ReflectionParameter $param, FactoryRepository $factories): ?ArgumentInstructionInterface
+			{
+				return null;
+			}
+		};
+
+		$compiler = new ArgumentPlanCompiler([$source]);
+		$plan     = $compiler->compile(
+			static fn (OperationContextInterface $ctx): string => 'ok',
+			$this->emptyRepo,
+		);
+
+		$this->assertCount(1, $plan->instructions);
+		$this->assertInstanceOf(ContextArgumentInstruction::class, $plan->instructions[0]);
+	}
+
+	public function testFirstMatchingSourceWins(): void
+	{
+		$instrA = new class () implements ArgumentInstructionInterface {
+			public function resolve(OperationContextInterface $context): mixed
+			{
+				return 'a';
+			}
+		};
+		$instrB = new class () implements ArgumentInstructionInterface {
+			public function resolve(OperationContextInterface $context): mixed
+			{
+				return 'b';
+			}
+		};
+
+		$sourceA = new class ($instrA) implements ArgumentSourceCompilerInterface {
+			public function __construct(private readonly ArgumentInstructionInterface $instr) {}
+
+			public function compile(ReflectionParameter $param, FactoryRepository $factories): ?ArgumentInstructionInterface
+			{
+				return $this->instr;
+			}
+		};
+		$sourceB = new class ($instrB) implements ArgumentSourceCompilerInterface {
+			public function __construct(private readonly ArgumentInstructionInterface $instr) {}
+
+			public function compile(ReflectionParameter $param, FactoryRepository $factories): ?ArgumentInstructionInterface
+			{
+				return $this->instr;
+			}
+		};
+
+		$compiler = new ArgumentPlanCompiler([$sourceA, $sourceB]);
+		$plan     = $compiler->compile(
+			static fn (OperationContextInterface $ctx): string => 'ok',
+			$this->emptyRepo,
+		);
+
+		$this->assertSame($instrA, $plan->instructions[0]);
 	}
 
 	public function testFactoryInstructionResolvesCorrectDependency(): void

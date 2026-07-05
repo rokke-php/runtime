@@ -7,15 +7,25 @@ namespace Rokke\Runtime\Build;
 use ReflectionFunction;
 use ReflectionNamedType;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
-use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
-use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
-use Rokke\Runtime\Contracts\OperationContextInterface;
 
 final class ArgumentPlanCompiler
 {
+	/** @var list<ArgumentSourceCompilerInterface> */
+	private readonly array $sources;
+
+	/** @param list<ArgumentSourceCompilerInterface> $sources Extra sources prepended before the built-in ones. */
+	public function __construct(array $sources = [])
+	{
+		$this->sources = [
+			...$sources,
+			new ContextArgumentSourceCompiler(),
+			new ServiceArgumentSourceCompiler(),
+		];
+	}
+
 	public function compile(callable $handler, FactoryRepository $factories): ArgumentResolutionPlan
 	{
-		$reflection  = new ReflectionFunction(\Closure::fromCallable($handler));
+		$reflection   = new ReflectionFunction(\Closure::fromCallable($handler));
 		$instructions = [];
 
 		foreach ($reflection->getParameters() as $param) {
@@ -27,29 +37,23 @@ final class ArgumentPlanCompiler
 				);
 			}
 
-			if ($type->isBuiltin()) {
+			$instruction = null;
+
+			foreach ($this->sources as $source) {
+				$instruction = $source->compile($param, $factories);
+
+				if ($instruction !== null) {
+					break;
+				}
+			}
+
+			if ($instruction === null) {
 				throw new \RuntimeException(
-					"Built-in type '{$type->getName()}' for parameter \${$param->getName()} is not injectable.",
+					"No argument source can resolve parameter \${$param->getName()} (type: {$type->getName()}).",
 				);
 			}
 
-			/** @var class-string $typeName */
-			$typeName = $type->getName();
-
-			if (is_a($typeName, OperationContextInterface::class, true)) {
-				$instructions[] = new ContextArgumentInstruction();
-				continue;
-			}
-
-			$factory = $factories->get($typeName);
-
-			if ($factory === null) {
-				throw new \RuntimeException(
-					"No service registered for type '{$typeName}'. Register it via \$builder->service() before building.",
-				);
-			}
-
-			$instructions[] = new FactoryArgumentInstruction($factory);
+			$instructions[] = $instruction;
 		}
 
 		return new ArgumentResolutionPlan($instructions);
