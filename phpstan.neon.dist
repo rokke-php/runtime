@@ -38,7 +38,7 @@ parameters:
         # In CI, real PHPUnit types are resolved via autoloader; local analysis accepts this gap.
         - message: '#Call to an undefined method .*::(createStub|createMock|once|exactly|never|any|logicalOr|logicalAnd|equalTo|assertSame|assertNotSame|assertInstanceOf|assertTrue|assertFalse|assertNull|assertCount|assertContains|assertStringContainsString|assertIsBool|assertGreaterThan|assertGreaterThanOrEqual|assertIsInt|assertIsString|assertIsArray|assertFileExists|assertFileDoesNotExist|expectException|expectExceptionMessage|markTestSkipped)\(\)#'
           path: tests/*
-        - message: '#Cannot call method (expects|method|with|willThrowException|willReturn)\(\) on mixed#'
+        - message: '#Cannot call method (expects|method|with|willThrowException|willReturn|willReturnCallback)\(\) on mixed#'
           path: tests/*
         - message: '#Parameter .* expects .*, mixed given#'
           path: tests/*
@@ -52,5 +52,12 @@ parameters:
           path: tests/*
         - message: '#Cannot call method getMessage\(\) on .*\|null#'
           path: tests/*
-        - message: '#Offset .* does not exist on array.*#'
+
+        # Variables assigned inside Swoole\Coroutine\run() closures look nullable to PHPStan;
+        # assertions inside the closure guarantee they are set by the time we access them.
+        - message: '#Cannot access property \$\w+ on .*\|null#'
+          path: tests/*
+
+        # Method is declared unused by PHPStan but kept as a test helper for future tests.
+        - message: '#Method .* is unused#'
           path: tests/*

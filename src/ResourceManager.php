@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Rokke\Runtime;
 
 use Rokke\Runtime\Contracts\PoolManagerInterface;
+use Rokke\Runtime\Resource\PoolConfig;
+use Rokke\Runtime\Resource\PoolStats;
 use RuntimeException;
 
 final class ResourceManager implements PoolManagerInterface
@@ -12,13 +14,13 @@ final class ResourceManager implements PoolManagerInterface
 	/** @var array<string, ResourcePool> */
 	private array $pools = [];
 
-	public function registerPool(string $name, callable $factory, int $min, int $max, int $timeout): void
+	public function register(PoolConfig $config, callable $factory): void
 	{
-		if (isset($this->pools[$name])) {
-			throw new RuntimeException("The pool [{$name}] is already registered.");
+		if (isset($this->pools[$config->name])) {
+			throw new RuntimeException("The pool [{$config->name}] is already registered.");
 		}
 
-		$this->pools[$name] = new ResourcePool($name, $factory, $min, $max, $timeout);
+		$this->pools[$config->name] = new ResourcePool($config, $factory);
 	}
 
 	public function acquire(string $poolName): mixed
@@ -31,14 +33,14 @@ final class ResourceManager implements PoolManagerInterface
 		$this->getPool($poolName)->release($resource);
 	}
 
-	/** @return array<string, mixed> */
-	public function stats(?string $poolName = null): array
+	public function stats(string $poolName): PoolStats
 	{
-		if ($poolName !== null) {
-			return $this->getPool($poolName)->stats();
-		}
+		return $this->getPool($poolName)->stats();
+	}
 
-		/** @var array<string, mixed> $stats */
+	/** @return array<string, PoolStats> */
+	public function allStats(): array
+	{
 		$stats = [];
 
 		foreach ($this->pools as $name => $pool) {
@@ -46,6 +48,11 @@ final class ResourceManager implements PoolManagerInterface
 		}
 
 		return $stats;
+	}
+
+	public function drain(string $poolName, float $timeout = 30.0): void
+	{
+		$this->getPool($poolName)->drain($timeout);
 	}
 
 	public function closeAll(): void
