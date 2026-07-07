@@ -19,7 +19,7 @@ use RuntimeException;
  *
  * All tests require the Swoole extension.
  */
-final class ResourcePoolV2Test extends TestCase
+final class ResourcePoolTest extends TestCase
 {
 	protected function setUp(): void
 	{
