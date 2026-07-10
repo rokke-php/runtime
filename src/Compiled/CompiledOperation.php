@@ -19,5 +19,6 @@ final readonly class CompiledOperation
 		public int $resultPlanId,
 		public int $interceptorChainId = 0,
 		public int $validationPlanId = 0,
+		public ?int $behaviorPipelineId = null,
 	) {}
 }

@@ -26,6 +26,7 @@ final class CompiledRuntime
 	 * @param array<int, ResultResolutionPlan>      $resultPlans
 	 * @param array<int, CompiledInterceptorChain>  $interceptorChains
 	 * @param array<int, ValidationPlan>            $validationPlans
+	 * @param array<int, CompiledBehaviorPipeline>  $behaviorPipelines
 	 */
 	public function __construct(
 		public readonly array $pipelines,
@@ -37,6 +38,7 @@ final class CompiledRuntime
 		?ArtifactRepository $artifacts = null,
 		public readonly array $interceptorChains = [],
 		public readonly array $validationPlans = [],
+		public readonly array $behaviorPipelines = [],
 	) {
 		$this->operations = $operations ?? OperationRepository::empty();
 		$this->factories  = $factories ?? FactoryRepository::empty();
