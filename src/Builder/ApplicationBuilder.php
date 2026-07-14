@@ -12,12 +12,11 @@ use Rokke\Runtime\ContextManager;
 use Rokke\Runtime\Contracts\ContextManagerInterface;
 use Rokke\Runtime\Contracts\HostInterface;
 use Rokke\Runtime\Contracts\LifecycleManagerInterface;
-use Rokke\Runtime\Contracts\ModuleSystemInterface;
 use Rokke\Runtime\Contracts\PoolManagerInterface;
+use Rokke\Runtime\Extension\ExtensionBuilder;
+use Rokke\Runtime\Extension\ExtensionRegistry;
 use Rokke\Runtime\Host;
 use Rokke\Runtime\Lifecycle;
-use Rokke\Runtime\Module\ModuleBuilder;
-use Rokke\Runtime\Module\ModuleSystem;
 use Rokke\Runtime\ResourceManager;
 use Rokke\Runtime\ServiceContainer;
 
@@ -28,25 +27,24 @@ final class ApplicationBuilder
 		$contextManager  = new ContextManager();
 		$resourceManager = new ResourceManager();
 
-		$container    = new ServiceContainer($contextManager, $resourceManager);
-		$lifecycle    = new Lifecycle();
-		$moduleSystem = new ModuleSystem();
-		$serverHost   = new Host($host, $port);
+		$container         = new ServiceContainer($contextManager, $resourceManager);
+		$lifecycle         = new Lifecycle();
+		$extensionRegistry = new ExtensionRegistry();
+		$serverHost        = new Host($host, $port);
 
 		$container->singleton(ContextManagerInterface::class, $contextManager);
 		$container->singleton(PoolManagerInterface::class, $resourceManager);
 		$container->singleton(LifecycleEventsInterface::class, $lifecycle);
 		$container->singleton(LifecycleManagerInterface::class, $lifecycle);
-		$container->singleton(ModuleSystemInterface::class, $moduleSystem);
 		$container->singleton(HostInterface::class, $serverHost);
 
 		// Discovery phase
-		$moduleBuilder = new ModuleBuilder();
-		$moduleSystem->buildAll($moduleBuilder);
+		$extensionBuilder = new ExtensionBuilder();
+		$extensionRegistry->buildAll($extensionBuilder);
 
 		// Modeling phase
 		$modelBuilder = new ModelBuilder([new OperationModelBuilderPass()]);
-		$model        = $modelBuilder->build($moduleBuilder->getCapabilities());
+		$model        = $modelBuilder->build($extensionBuilder->getCapabilities());
 
 		// Assembly phase
 		$runtimeBuilder = new DefaultRuntimeBuilder();

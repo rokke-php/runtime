@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Rokke\Runtime\Tests\Module;
+namespace Rokke\Runtime\Tests\Extension;
 
 use PHPUnit\Framework\TestCase;
 use Rokke\Contracts\Module\CapabilityInterface;
 use Rokke\Contracts\Module\DiscoveryProviderInterface;
-use Rokke\Runtime\Module\ModuleBuilder;
+use Rokke\Runtime\Extension\ExtensionBuilder;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -22,13 +22,13 @@ final class ProviderDouble implements DiscoveryProviderInterface
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-final class ModuleBuilderTest extends TestCase
+final class ExtensionBuilderTest extends TestCase
 {
-	private ModuleBuilder $builder;
+	private ExtensionBuilder $builder;
 
 	protected function setUp(): void
 	{
-		$this->builder = new ModuleBuilder();
+		$this->builder = new ExtensionBuilder();
 	}
 
 	public function testGetDiscoveryProvidersEmptyByDefault(): void

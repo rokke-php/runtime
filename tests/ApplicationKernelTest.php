@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Contracts\Extension\ExtensionBuilderInterface;
+use Rokke\Contracts\Extension\ExtensionInterface;
 use Rokke\Contracts\Module\CapabilityInterface;
 use Rokke\Contracts\Module\DiscoveryProviderInterface;
-use Rokke\Contracts\Module\ModuleBuilderInterface;
-use Rokke\Contracts\Module\ModuleInterface;
 use Rokke\Runtime\ApplicationKernel;
 use Rokke\Runtime\Build\OperationCapability;
 use Rokke\Runtime\Contracts\OperationContextInterface;
@@ -17,9 +17,9 @@ use Rokke\Runtime\Contracts\OperationContextInterface;
 
 final class KernelServiceFixture {}
 
-final class GreetModule implements ModuleInterface
+final class GreetExtension implements ExtensionInterface
 {
-	public function register(ModuleBuilderInterface $builder): void
+	public function register(ExtensionBuilderInterface $builder): void
 	{
 		$builder->addCapability(new OperationCapability(
 			id: 'greet',
@@ -29,9 +29,9 @@ final class GreetModule implements ModuleInterface
 	}
 }
 
-final class MultiOpModule implements ModuleInterface
+final class MultiOpExtension implements ExtensionInterface
 {
-	public function register(ModuleBuilderInterface $builder): void
+	public function register(ExtensionBuilderInterface $builder): void
 	{
 		$builder->addCapability(new OperationCapability('op.a', 'A', static fn (): string => 'result-a'));
 		$builder->addCapability(new OperationCapability('op.b', 'B', static fn (): string => 'result-b'));
@@ -64,7 +64,7 @@ final class ApplicationKernelTest extends TestCase
 	public function testRunExecutesRegisteredOperation(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new GreetModule());
+		$kernel->register(new GreetExtension());
 		$kernel->build();
 
 		$result = $kernel->run('greet');
@@ -75,18 +75,18 @@ final class ApplicationKernelTest extends TestCase
 	public function testRunExecutesCorrectOperationAmongMultiple(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new MultiOpModule());
+		$kernel->register(new MultiOpExtension());
 		$kernel->build();
 
 		$this->assertSame('result-a', $kernel->run('op.a'));
 		$this->assertSame('result-b', $kernel->run('op.b'));
 	}
 
-	public function testBuildSucceedsWhenModuleRegistersService(): void
+	public function testBuildSucceedsWhenExtensionRegistersService(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$kernel->register(new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$builder->service(KernelServiceFixture::class);
 			}
@@ -101,8 +101,8 @@ final class ApplicationKernelTest extends TestCase
 	public function testHandlerReceivesInjectedService(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$kernel->register(new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$builder->service(KernelServiceFixture::class);
 				$builder->addCapability(new OperationCapability(
@@ -122,8 +122,8 @@ final class ApplicationKernelTest extends TestCase
 	public function testHandlerWithBothServiceAndContextReceivesBoth(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$kernel->register(new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$builder->service(KernelServiceFixture::class);
 				$builder->addCapability(new OperationCapability(
@@ -143,8 +143,8 @@ final class ApplicationKernelTest extends TestCase
 	public function testBuildThrowsForHandlerWithNoReturnType(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$kernel->register(new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$builder->addCapability(new OperationCapability(
 					id: 'untyped',
@@ -161,8 +161,8 @@ final class ApplicationKernelTest extends TestCase
 	public function testVoidHandlerReturnsNull(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$kernel->register(new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$builder->addCapability(new OperationCapability(
 					id: 'void',
@@ -180,10 +180,10 @@ final class ApplicationKernelTest extends TestCase
 	{
 		$expected = new KernelServiceFixture();
 		$kernel   = new ApplicationKernel();
-		$kernel->register(new class ($expected) implements ModuleInterface {
+		$kernel->register(new class ($expected) implements ExtensionInterface {
 			public function __construct(private readonly KernelServiceFixture $dto) {}
 
-			public function register(ModuleBuilderInterface $builder): void
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$dto = $this->dto;
 				$builder->addCapability(new OperationCapability(
@@ -203,8 +203,8 @@ final class ApplicationKernelTest extends TestCase
 	public function testDiscoveredCapabilitiesAreCompiledAndRunnable(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$kernel->register(new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$builder->addDiscoveryProvider(new class () implements DiscoveryProviderInterface {
 					/** @return list<CapabilityInterface> */
@@ -225,8 +225,8 @@ final class ApplicationKernelTest extends TestCase
 	public function testDiscoveredAndExplicitCapabilitiesCoexist(): void
 	{
 		$kernel = new ApplicationKernel();
-		$kernel->register(new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$kernel->register(new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
 				$builder->addCapability(new OperationCapability('explicit.op', 'Explicit', static fn (): string => 'explicit'));
 				$builder->addDiscoveryProvider(new class () implements DiscoveryProviderInterface {
@@ -246,29 +246,29 @@ final class ApplicationKernelTest extends TestCase
 		$this->assertSame('auto', $kernel->run('auto.op'));
 	}
 
-	public function testRegisterAccumulatesModulesBeforeBuild(): void
+	public function testRegisterAccumulatesExtensionsBeforeBuild(): void
 	{
 		$kernel = new ApplicationKernel();
 
-		$modA = new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$extA = new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
-				$builder->addCapability(new OperationCapability('mod-a', 'A', static fn (): string => 'a'));
+				$builder->addCapability(new OperationCapability('ext-a', 'A', static fn (): string => 'a'));
 			}
 		};
 
-		$modB = new class () implements ModuleInterface {
-			public function register(ModuleBuilderInterface $builder): void
+		$extB = new class () implements ExtensionInterface {
+			public function register(ExtensionBuilderInterface $builder): void
 			{
-				$builder->addCapability(new OperationCapability('mod-b', 'B', static fn (): string => 'b'));
+				$builder->addCapability(new OperationCapability('ext-b', 'B', static fn (): string => 'b'));
 			}
 		};
 
-		$kernel->register($modA);
-		$kernel->register($modB);
+		$kernel->register($extA);
+		$kernel->register($extB);
 		$kernel->build();
 
-		$this->assertSame('a', $kernel->run('mod-a'));
-		$this->assertSame('b', $kernel->run('mod-b'));
+		$this->assertSame('a', $kernel->run('ext-a'));
+		$this->assertSame('b', $kernel->run('ext-b'));
 	}
 }

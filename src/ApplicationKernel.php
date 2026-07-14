@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime;
 
-use Rokke\Contracts\Module\ModuleInterface;
+use Rokke\Contracts\Extension\ExtensionInterface;
 use Rokke\Runtime\Build\DiscoveryEngine;
 use Rokke\Runtime\Build\ModelBuilder;
 use Rokke\Runtime\Build\OperationModelBuilderPass;
@@ -12,32 +12,32 @@ use Rokke\Runtime\Build\ServiceModelBuilderPass;
 use Rokke\Runtime\Builder\DefaultRuntimeBuilder;
 use Rokke\Runtime\Context\OperationContext;
 use Rokke\Runtime\Contracts\RuntimeInterface;
-use Rokke\Runtime\Module\ModuleBuilder;
-use Rokke\Runtime\Module\ModuleSystem;
+use Rokke\Runtime\Extension\ExtensionBuilder;
+use Rokke\Runtime\Extension\ExtensionRegistry;
 
 final class ApplicationKernel
 {
-	private ModuleSystem $modules;
+	private ExtensionRegistry $extensions;
 	private ?RuntimeInterface $runtime = null;
 
 	public function __construct()
 	{
-		$this->modules = new ModuleSystem();
+		$this->extensions = new ExtensionRegistry();
 	}
 
-	public function register(ModuleInterface $module): void
+	public function register(ExtensionInterface $extension): void
 	{
-		$this->modules->register($module);
+		$this->extensions->register($extension);
 	}
 
 	public function build(): void
 	{
-		$moduleBuilder = new ModuleBuilder();
-		$this->modules->buildAll($moduleBuilder);
+		$builder = new ExtensionBuilder();
+		$this->extensions->buildAll($builder);
 
-		$discovered = (new DiscoveryEngine())->run($moduleBuilder->getDiscoveryProviders());
+		$discovered = (new DiscoveryEngine())->run($builder->getDiscoveryProviders());
 
-		$allCapabilities = [...$moduleBuilder->getCapabilities(), ...$discovered];
+		$allCapabilities = [...$builder->getCapabilities(), ...$discovered];
 
 		$model         = (new ModelBuilder([new OperationModelBuilderPass(), new ServiceModelBuilderPass()]))->build($allCapabilities);
 		$this->runtime = (new DefaultRuntimeBuilder())->build($model);

@@ -6,7 +6,7 @@ namespace Rokke\Runtime\Tests\Build;
 
 use PHPUnit\Framework\TestCase;
 use Rokke\Runtime\Build\ServiceCapability;
-use Rokke\Runtime\Module\ModuleBuilder;
+use Rokke\Runtime\Extension\ExtensionBuilder;
 
 interface ServiceCapabilityTestRepository {}
 final class ServiceCapabilityTestRepositoryImpl implements ServiceCapabilityTestRepository {}
@@ -32,9 +32,9 @@ final class ServiceCapabilityTest extends TestCase
 		$this->assertSame(ServiceCapabilityTestRepositoryImpl::class, $cap->implementation);
 	}
 
-	public function testModuleBuilderServiceWithSingleArgAddsCapabilityWithContractAsImplementation(): void
+	public function testExtensionBuilderServiceWithSingleArgAddsCapabilityWithContractAsImplementation(): void
 	{
-		$builder = new ModuleBuilder();
+		$builder = new ExtensionBuilder();
 		$builder->service(ServiceCapabilityTestRepositoryImpl::class);
 
 		$capabilities = $builder->getCapabilities();
@@ -48,9 +48,9 @@ final class ServiceCapabilityTest extends TestCase
 		$this->assertSame(ServiceCapabilityTestRepositoryImpl::class, $cap->implementation);
 	}
 
-	public function testModuleBuilderServiceWithTwoArgsAddsCapabilityWithDistinctContractAndImplementation(): void
+	public function testExtensionBuilderServiceWithTwoArgsAddsCapabilityWithDistinctContractAndImplementation(): void
 	{
-		$builder = new ModuleBuilder();
+		$builder = new ExtensionBuilder();
 		$builder->service(
 			ServiceCapabilityTestRepository::class,
 			ServiceCapabilityTestRepositoryImpl::class,
@@ -68,7 +68,7 @@ final class ServiceCapabilityTest extends TestCase
 
 	public function testMultipleServiceCallsAccumulateCapabilities(): void
 	{
-		$builder = new ModuleBuilder();
+		$builder = new ExtensionBuilder();
 		$builder->service(ServiceCapabilityTestRepositoryImpl::class);
 		$builder->service(
 			ServiceCapabilityTestRepository::class,
