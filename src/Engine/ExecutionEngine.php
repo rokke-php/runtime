@@ -4,99 +4,34 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Engine;
 
-use Rokke\Runtime\Compiled\CompiledBehaviorPipeline;
-use Rokke\Runtime\Compiled\CompiledPipeline;
 use Rokke\Runtime\Compiled\CompiledRuntime;
-use Rokke\Runtime\Contracts\InvokerInterface;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Contracts\RuntimeInterface;
 
 /**
- * Assembles and dispatches the execution chain for an operation:
+ * Dispatches an operation through the compiled execution infrastructure.
  *
- *   CompiledBehaviorPipeline (compiled cross-cutting behaviors, e.g. auth, tx)
- *     └─ CompiledPipeline (transport middleware stages)
- *          └─ Invoker (resolves args, calls handler, maps result)
+ * The Engine has no knowledge of handlers, argument plans, behaviors, or result
+ * plans. It only coordinates two compiled artefacts:
  *
- * All structure is resolved from CompiledRuntime by integer ID — no discovery at runtime.
- * When $runtime is null, falls back to $middlewares (legacy / standalone test path).
+ *   CompiledInterceptorPipeline (global observability: telemetry, logging, metrics)
+ *       └─ CompiledExecutionPipeline (Argument → Behavior → Invocation → Result)
+ *
+ * Any new cross-cutting concern should be added via ExecutionInterceptorInterface,
+ * not by modifying this class.
  */
 final readonly class ExecutionEngine implements RuntimeInterface
 {
-	/** @param callable[] $middlewares  Legacy global middlewares; used only when $runtime is null */
-	public function __construct(
-		private InvokerInterface $invoker,
-		private array $middlewares = [],
-		private ?CompiledRuntime $runtime = null,
-	) {}
+	public function __construct(private CompiledRuntime $runtime) {}
 
 	public function execute(OperationInterface $operation, OperationContextInterface $context): mixed
 	{
-		$core = fn (): mixed => $this->dispatchThroughMiddleware($operation, $context);
+		$compiled = $this->runtime->operations->find($operation->id())
+			?? throw new \RuntimeException("No compiled operation found for id '{$operation->id()}'.");
 
-		$behaviorPipeline = $this->resolveBehaviorPipeline($operation);
+		$core = fn (): mixed => $this->runtime->executionPipeline->execute($compiled, $context);
 
-		if ($behaviorPipeline !== null) {
-			return $behaviorPipeline->execute($context, $core);
-		}
-
-		return $core();
-	}
-
-	private function dispatchThroughMiddleware(
-		OperationInterface $operation,
-		OperationContextInterface $context,
-	): mixed {
-		$stages = $this->resolveMiddlewareStages($operation);
-		$invoke = fn (): mixed => $this->invoker->invoke($operation, $context);
-
-		if ($stages === []) {
-			return $invoke();
-		}
-
-		$chain = array_reduce(
-			array_reverse($stages),
-			fn (callable $next, callable $stage): \Closure =>
-				fn (): mixed => $stage($operation, $context, $next),
-			$invoke,
-		);
-
-		return ($chain)();
-	}
-
-	private function resolveBehaviorPipeline(OperationInterface $operation): ?CompiledBehaviorPipeline
-	{
-		if ($this->runtime === null) {
-			return null;
-		}
-
-		$compiled = $this->runtime->operations->find($operation->id());
-
-		if ($compiled === null || $compiled->behaviorPipelineId === null) {
-			return null;
-		}
-
-		$pipeline = $this->runtime->behaviorPipelines[$compiled->behaviorPipelineId] ?? null;
-
-		return $pipeline instanceof CompiledBehaviorPipeline ? $pipeline : null;
-	}
-
-	/** @return callable[] */
-	private function resolveMiddlewareStages(OperationInterface $operation): array
-	{
-		if ($this->runtime === null) {
-			return $this->middlewares;
-		}
-
-		$compiled = $this->runtime->operations->find($operation->id());
-
-		if ($compiled === null) {
-			return [];
-		}
-
-		$pipeline = $this->runtime->pipelines[$compiled->pipelineId] ?? null;
-
-		return $pipeline instanceof CompiledPipeline ? $pipeline->stages : [];
+		return $this->runtime->interceptorPipeline->execute($context, $core);
 	}
 }

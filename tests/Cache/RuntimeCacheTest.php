@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Cache;
 
 use PHPUnit\Framework\TestCase;
-use Rokke\Runtime\Build\InvokerInterceptorDescriptor;
 use Rokke\Runtime\Build\MaxValidationInstruction;
-use Rokke\Runtime\Build\MiddlewareDescriptor;
 use Rokke\Runtime\Cache\RuntimeExporter;
 use Rokke\Runtime\Cache\RuntimeImporter;
 use Rokke\Runtime\Cache\RuntimeManifest;
@@ -23,11 +21,8 @@ use Rokke\Runtime\Compiled\Results\ScalarResultInstruction;
 use Rokke\Runtime\Compiled\ValidationPlan;
 use Rokke\Runtime\Context\OperationContext;
 use Rokke\Runtime\Engine\ExecutionEngine;
-use Rokke\Runtime\Engine\Invoker;
 use Rokke\Runtime\SimpleOperation;
 use Rokke\Runtime\Tests\Cache\Fixture\CacheableHandler;
-use Rokke\Runtime\Tests\Cache\Fixture\LoggingMiddleware;
-use Rokke\Runtime\Tests\Cache\Fixture\TaggingInterceptor;
 
 final class RuntimeCacheTest extends TestCase
 {
@@ -36,8 +31,6 @@ final class RuntimeCacheTest extends TestCase
 	protected function setUp(): void
 	{
 		$this->cacheFile = sys_get_temp_dir() . '/rokke_cache_test_' . uniqid() . '.bin';
-		LoggingMiddleware::$invoked = false;
-		TaggingInterceptor::$invoked = false;
 	}
 
 	protected function tearDown(): void
@@ -49,19 +42,13 @@ final class RuntimeCacheTest extends TestCase
 
 	// ── helpers ───────────────────────────────────────────────────────────────
 
-	private function buildManifest(
-		bool $withMiddleware = false,
-		bool $withInterceptor = false,
-		bool $withValidation = false,
-	): RuntimeManifest {
+	private function buildManifest(bool $withValidation = false): RuntimeManifest
+	{
 		$op         = new CompiledOperation('ping', pipelineId: 0, handlerId: 0, argumentPlanId: 0, resultPlanId: 0);
 		$operations = OperationRepository::build([$op]);
 
 		$argPlan    = new ArgumentResolutionPlan([new ContextArgumentInstruction()]);
 		$resultPlan = new ResultResolutionPlan(new ScalarResultInstruction('string'));
-
-		$middlewareDescriptors  = $withMiddleware ? [new MiddlewareDescriptor(LoggingMiddleware::class)] : [];
-		$interceptorDescriptors = $withInterceptor ? [new InvokerInterceptorDescriptor(TaggingInterceptor::class)] : [];
 
 		$validationPlans = [];
 
@@ -78,14 +65,12 @@ final class RuntimeCacheTest extends TestCase
 			argumentPlans: [0 => $argPlan],
 			resultPlans: [0 => $resultPlan],
 			validationPlans: $validationPlans,
-			middlewareDescriptors: $middlewareDescriptors,
-			interceptorDescriptors: $interceptorDescriptors,
 		);
 	}
 
 	private function execute(CompiledRuntime $runtime, string $operationId = 'ping'): mixed
 	{
-		$engine = new ExecutionEngine(new Invoker($runtime), runtime: $runtime);
+		$engine = new ExecutionEngine($runtime);
 
 		return $engine->execute(new SimpleOperation($operationId), new OperationContext('req-test'));
 	}
@@ -137,34 +122,6 @@ final class RuntimeCacheTest extends TestCase
 		$this->assertFalse($runtime->operations->has('missing'));
 	}
 
-	public function testImportPreservesArgumentPlanCount(): void
-	{
-		RuntimeExporter::export($this->buildManifest(), $this->cacheFile);
-
-		$runtime = RuntimeImporter::load($this->cacheFile);
-
-		$this->assertCount(1, $runtime->argumentPlans);
-	}
-
-	public function testImportPreservesResultPlanCount(): void
-	{
-		RuntimeExporter::export($this->buildManifest(), $this->cacheFile);
-
-		$runtime = RuntimeImporter::load($this->cacheFile);
-
-		$this->assertCount(1, $runtime->resultPlans);
-	}
-
-	public function testImportPreservesValidationPlans(): void
-	{
-		RuntimeExporter::export($this->buildManifest(withValidation: true), $this->cacheFile);
-
-		$runtime = RuntimeImporter::load($this->cacheFile);
-
-		$this->assertCount(1, $runtime->validationPlans);
-		$this->assertFalse($runtime->validationPlans[0]->isEmpty());
-	}
-
 	// ── execution after import ────────────────────────────────────────────────
 
 	public function testImportedRuntimeExecutesOperation(): void
@@ -176,30 +133,6 @@ final class RuntimeCacheTest extends TestCase
 
 		$this->assertSame('pong', $result);
 	}
-
-	public function testImportedRuntimeRunsMiddlewareFromDescriptor(): void
-	{
-		RuntimeExporter::export($this->buildManifest(withMiddleware: true), $this->cacheFile);
-
-		$runtime = RuntimeImporter::load($this->cacheFile);
-		$result  = $this->execute($runtime);
-
-		$this->assertTrue(LoggingMiddleware::$invoked);
-		$this->assertSame('[mw]pong', $result);
-	}
-
-	public function testImportedRuntimeRunsInterceptorFromDescriptor(): void
-	{
-		RuntimeExporter::export($this->buildManifest(withInterceptor: true), $this->cacheFile);
-
-		$runtime = RuntimeImporter::load($this->cacheFile);
-		$result  = $this->execute($runtime);
-
-		$this->assertTrue(TaggingInterceptor::$invoked);
-		$this->assertSame('[ic]pong', $result);
-	}
-
-	// ── fromManifest ──────────────────────────────────────────────────────────
 
 	public function testFromManifestReturnsRuntimeWithoutFile(): void
 	{

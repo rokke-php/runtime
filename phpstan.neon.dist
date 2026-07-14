@@ -61,3 +61,13 @@ parameters:
         # Method is declared unused by PHPStan but kept as a test helper for future tests.
         - message: '#Method .* is unused#'
           path: tests/*
+
+        # Anonymous-class properties that are written via reference bindings look
+        # "never read" to PHPStan because the read happens through the outer variable.
+        - message: '#Property .* is never read, only written#'
+          path: tests/*
+
+        # Outer variables captured by-reference in closures lose their array type
+        # context when PHPStan analyses the closure body; the runtime type is correct.
+        - message: '#Cannot access an offset on mixed#'
+          path: tests/*
