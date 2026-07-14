@@ -13,12 +13,13 @@ use Rokke\Runtime\Build\ResultPlanCompiler;
 use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Compiled\ArtifactRepository;
 use Rokke\Runtime\Compiled\CompiledBehaviorPipeline;
+use Rokke\Runtime\Compiled\CompiledExecutionPipeline;
+use Rokke\Runtime\Compiled\CompiledInterceptorPipeline;
 use Rokke\Runtime\Compiled\CompiledOperation;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 use Rokke\Runtime\Compiled\OperationRepository;
 use Rokke\Runtime\Contracts\RuntimeInterface;
 use Rokke\Runtime\Engine\ExecutionEngine;
-use Rokke\Runtime\Engine\Invoker;
 
 final class DefaultRuntimeBuilder
 {
@@ -29,13 +30,13 @@ final class DefaultRuntimeBuilder
 			new FactoryCompiler(),
 		);
 
-		$argCompiler      = new ArgumentPlanCompiler();
-		$resultCompiler   = new ResultPlanCompiler();
-		$handlers         = [];
-		$argumentPlans    = [];
-		$resultPlans      = [];
+		$argCompiler       = new ArgumentPlanCompiler();
+		$resultCompiler    = new ResultPlanCompiler();
+		$handlers          = [];
+		$argumentPlans     = [];
+		$resultPlans       = [];
 		$behaviorPipelines = [];
-		$compiledOps      = [];
+		$compiledOps       = [];
 
 		foreach ($model->definitions(OperationDefinition::class) as $index => $definition) {
 			$handlers[$index]      = $definition->handler;
@@ -45,33 +46,38 @@ final class DefaultRuntimeBuilder
 			$behaviorPipelineId = null;
 
 			if ($definition->behaviors !== []) {
-				$behaviorPipelineId                    = $index;
+				$behaviorPipelineId                     = $index;
 				$behaviorPipelines[$behaviorPipelineId] = new CompiledBehaviorPipeline(
 					array_map(static fn ($d) => $d->behavior, $definition->behaviors),
 				);
 			}
 
 			$compiledOps[] = new CompiledOperation(
-				$definition->id,
-				0,
-				$index,
-				$index,
-				$index,
+				id: $definition->id,
+				pipelineId: 0,
+				handlerId: $index,
+				argumentPlanId: $index,
+				resultPlanId: $index,
 				behaviorPipelineId: $behaviorPipelineId,
 			);
 		}
 
-		$compiled = new CompiledRuntime(
-			pipelines: [],
+		$executionPipeline = new CompiledExecutionPipeline(
 			handlers: $handlers,
 			argumentPlans: $argumentPlans,
 			resultPlans: $resultPlans,
+			behaviorPipelines: $behaviorPipelines,
+			validationPlans: [],
+		);
+
+		$compiled = new CompiledRuntime(
+			executionPipeline: $executionPipeline,
+			interceptorPipeline: CompiledInterceptorPipeline::empty(),
 			operations: OperationRepository::build($compiledOps),
 			factories: $factories,
 			artifacts: ArtifactRepository::empty(),
-			behaviorPipelines: $behaviorPipelines,
 		);
 
-		return new ExecutionEngine(new Invoker($compiled), runtime: $compiled);
+		return new ExecutionEngine($compiled);
 	}
 }

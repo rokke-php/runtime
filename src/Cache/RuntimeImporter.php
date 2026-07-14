@@ -6,16 +6,16 @@ namespace Rokke\Runtime\Cache;
 
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
-use Rokke\Runtime\Build\InterceptorChainCompiler;
-use Rokke\Runtime\Build\PipelineCompiler;
+use Rokke\Runtime\Compiled\CompiledExecutionPipeline;
+use Rokke\Runtime\Compiled\CompiledInterceptorPipeline;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 
 /**
  * Restores a CompiledRuntime from a cache file produced by RuntimeExporter.
  *
- * Callables (pipeline stages, interceptor stages, handler instances) are
- * reconstructed from the stored class names — no reflection is re-run.
- * The only work done here is object instantiation and closure wrapping.
+ * Callables (handler instances) are reconstructed from the stored class names —
+ * no reflection is re-run. The only work done here is object instantiation and
+ * wiring the CompiledExecutionPipeline with the deserialized data tables.
  */
 final class RuntimeImporter
 {
@@ -61,26 +61,24 @@ final class RuntimeImporter
 			$manifest->handlerClasses,
 		);
 
-		$pipelineCompiler = new PipelineCompiler();
-		$pipeline         = $pipelineCompiler->compile($manifest->middlewareDescriptors);
-
-		$interceptorCompiler = new InterceptorChainCompiler();
-		$interceptorChain    = $interceptorCompiler->compile($manifest->interceptorDescriptors);
-
 		$factories = $manifest->serviceDescriptors !== []
 			? FactoryRepository::build($manifest->serviceDescriptors, new FactoryCompiler())
 			: FactoryRepository::empty();
 
-		return new CompiledRuntime(
-			pipelines: [0 => $pipeline],
+		$executionPipeline = new CompiledExecutionPipeline(
 			handlers: $handlers,
 			argumentPlans: $manifest->argumentPlans,
 			resultPlans: $manifest->resultPlans,
+			behaviorPipelines: [],
+			validationPlans: $manifest->validationPlans,
+		);
+
+		return new CompiledRuntime(
+			executionPipeline: $executionPipeline,
+			interceptorPipeline: CompiledInterceptorPipeline::empty(),
 			operations: $manifest->operations,
 			factories: $factories,
 			artifacts: $manifest->artifacts,
-			interceptorChains: [0 => $interceptorChain],
-			validationPlans: $manifest->validationPlans,
 		);
 	}
 }

@@ -5,182 +5,30 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Engine;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Contracts\Execution\ExecutionInterceptorInterface;
+use Rokke\Runtime\Build\ApplicationModel;
+use Rokke\Runtime\Build\OperationDefinition;
+use Rokke\Runtime\Builder\DefaultRuntimeBuilder;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
+use Rokke\Runtime\Compiled\CompiledExecutionPipeline;
+use Rokke\Runtime\Compiled\CompiledInterceptorPipeline;
 use Rokke\Runtime\Compiled\CompiledOperation;
-use Rokke\Runtime\Compiled\CompiledPipeline;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 use Rokke\Runtime\Compiled\OperationRepository;
 use Rokke\Runtime\Compiled\Results\ResultResolutionPlan;
 use Rokke\Runtime\Compiled\Results\ScalarResultInstruction;
-use Rokke\Runtime\Contracts\InvokerInterface;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Engine\ExecutionEngine;
-use Rokke\Runtime\Engine\Invoker;
 
 final class ExecutionEngineTest extends TestCase
 {
-	private function makeOperation(): OperationInterface
-	{
-		return $this->createStub(OperationInterface::class);
-	}
-
-	private function makeContext(): OperationContextInterface
+	private function makeCtx(): OperationContextInterface
 	{
 		return $this->createStub(OperationContextInterface::class);
 	}
 
-	public function testCallsInvokerDirectlyWithNoMiddlewares(): void
-	{
-		$invoker = $this->createMock(InvokerInterface::class);
-		$invoker->expects($this->once())->method('invoke')->willReturn('direct');
-
-		$engine = new ExecutionEngine($invoker);
-		$result = $engine->execute($this->makeOperation(), $this->makeContext());
-
-		$this->assertSame('direct', $result);
-	}
-
-	public function testSingleMiddlewareWrapsInvokerAndCallsNext(): void
-	{
-		$invoker = $this->createStub(InvokerInterface::class);
-		$invoker->method('invoke')->willReturn('core');
-
-		$called     = false;
-		$middleware = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$called): mixed {
-			$called = true;
-
-			return $next();
-		};
-
-		$engine = new ExecutionEngine($invoker, [$middleware]);
-		$result = $engine->execute($this->makeOperation(), $this->makeContext());
-
-		$this->assertTrue($called);
-		$this->assertSame('core', $result);
-	}
-
-	public function testMiddlewaresRunOutermostFirst(): void
-	{
-		$order   = [];
-		$invoker = $this->createStub(InvokerInterface::class);
-		$invoker->method('invoke')->willReturn('done');
-
-		$first = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
-			$order[] = 'first';
-			$result  = $next();
-			$order[] = 'first-after';
-
-			return $result;
-		};
-
-		$second = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
-			$order[] = 'second';
-			$result  = $next();
-			$order[] = 'second-after';
-
-			return $result;
-		};
-
-		$engine = new ExecutionEngine($invoker, [$first, $second]);
-		$engine->execute($this->makeOperation(), $this->makeContext());
-
-		$this->assertSame(['first', 'second', 'second-after', 'first-after'], $order);
-	}
-
-	public function testMiddlewareCanShortCircuitWithoutCallingInvoker(): void
-	{
-		$invoker = $this->createMock(InvokerInterface::class);
-		$invoker->expects($this->never())->method('invoke');
-
-		$middleware = fn (OperationInterface $op, OperationContextInterface $ctx, callable $next): string => 'short-circuit';
-
-		$engine = new ExecutionEngine($invoker, [$middleware]);
-		$result = $engine->execute($this->makeOperation(), $this->makeContext());
-
-		$this->assertSame('short-circuit', $result);
-	}
-
-	public function testMiddlewareReceivesOperationAndContext(): void
-	{
-		$op  = $this->makeOperation();
-		$ctx = $this->makeContext();
-
-		$receivedOp  = null;
-		$receivedCtx = null;
-
-		$invoker = $this->createStub(InvokerInterface::class);
-		$invoker->method('invoke')->willReturn(null);
-
-		$middleware = function (OperationInterface $o, OperationContextInterface $c, callable $next) use (&$receivedOp, &$receivedCtx): mixed {
-			$receivedOp  = $o;
-			$receivedCtx = $c;
-
-			return $next();
-		};
-
-		$engine = new ExecutionEngine($invoker, [$middleware]);
-		$engine->execute($op, $ctx);
-
-		$this->assertSame($op, $receivedOp);
-		$this->assertSame($ctx, $receivedCtx);
-	}
-
-	public function testMiddlewareExceptionPropagates(): void
-	{
-		$invoker    = $this->createStub(InvokerInterface::class);
-		$middleware = fn (OperationInterface $op, OperationContextInterface $ctx, callable $next): never =>
-			throw new \RuntimeException('middleware blew up');
-
-		$this->expectException(\RuntimeException::class);
-		$this->expectExceptionMessage('middleware blew up');
-
-		$engine = new ExecutionEngine($invoker, [$middleware]);
-		$engine->execute($this->makeOperation(), $this->makeContext());
-	}
-
-	public function testReturnValueFlowsThroughAllMiddlewares(): void
-	{
-		$invoker = $this->createStub(InvokerInterface::class);
-		$invoker->method('invoke')->willReturn(42);
-
-		$passthrough = fn (OperationInterface $op, OperationContextInterface $ctx, callable $next): mixed => $next();
-
-		$engine = new ExecutionEngine($invoker, [$passthrough, $passthrough]);
-		$result = $engine->execute($this->makeOperation(), $this->makeContext());
-
-		$this->assertSame(42, $result);
-	}
-
-	// ── Compiled pipeline path ────────────────────────────────────────────────
-
-	/** @param list<callable(OperationInterface, OperationContextInterface, callable): mixed> $stages */
-	private function makeCompiledRuntime(string $opId, array $stages): CompiledRuntime
-	{
-		$op = new CompiledOperation(
-			id: $opId,
-			pipelineId: 0,
-			handlerId: 0,
-			argumentPlanId: 0,
-			resultPlanId: 0,
-		);
-
-		$handler      = static fn (): string => 'core';
-		$argPlan      = new ArgumentResolutionPlan([]);
-		$resultPlan   = new ResultResolutionPlan(new ScalarResultInstruction('string'));
-		$pipeline     = new CompiledPipeline($stages);
-		$operations   = OperationRepository::build([$op]);
-
-		return new CompiledRuntime(
-			pipelines: [0 => $pipeline],
-			handlers: [0 => $handler],
-			argumentPlans: [0 => $argPlan],
-			resultPlans: [0 => $resultPlan],
-			operations: $operations,
-		);
-	}
-
-	private function makeRealOperation(string $id): OperationInterface
+	private function makeOp(string $id = 'op'): OperationInterface
 	{
 		$op = $this->createStub(OperationInterface::class);
 		$op->method('id')->willReturn($id);
@@ -188,78 +36,192 @@ final class ExecutionEngineTest extends TestCase
 		return $op;
 	}
 
-	public function testCompiledPipelineStagesRunAroundInvoker(): void
+	private function makeRuntime(string $opId = 'op', ?callable $handler = null): CompiledRuntime
 	{
-		$order   = [];
-		$stage   = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
-			$order[] = 'before';
-			$result  = $next();
-			$order[] = 'after';
+		$handler ??= static fn (): string => 'core';
 
-			return $result;
-		};
+		$op = new CompiledOperation($opId, 0, 0, 0, 0);
 
-		$runtime = $this->makeCompiledRuntime('greet', [$stage]);
-		$engine  = new ExecutionEngine(new Invoker($runtime), runtime: $runtime);
+		$execPipeline = new CompiledExecutionPipeline(
+			handlers: [0 => $handler],
+			argumentPlans: [0 => new ArgumentResolutionPlan([])],
+			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
 
-		$engine->execute($this->makeRealOperation('greet'), $this->makeContext());
-
-		$this->assertSame(['before', 'after'], $order);
+		return new CompiledRuntime(
+			executionPipeline: $execPipeline,
+			interceptorPipeline: CompiledInterceptorPipeline::empty(),
+			operations: OperationRepository::build([$op]),
+		);
 	}
 
-	public function testCompiledPipelineEmptyRunsCoreDirectly(): void
-	{
-		$runtime = $this->makeCompiledRuntime('greet', []);
-		$engine  = new ExecutionEngine(new Invoker($runtime), runtime: $runtime);
+	// ── Core dispatch ─────────────────────────────────────────────────────────
 
-		$result = $engine->execute($this->makeRealOperation('greet'), $this->makeContext());
+	public function testDispatchesOperationToExecutionPipeline(): void
+	{
+		$engine = new ExecutionEngine($this->makeRuntime());
+
+		$result = $engine->execute($this->makeOp(), $this->makeCtx());
 
 		$this->assertSame('core', $result);
 	}
 
-	public function testCompiledPipelineStagesRunOutermostFirst(): void
+	public function testThrowsForUnknownOperationId(): void
 	{
-		$order = [];
+		$engine = new ExecutionEngine($this->makeRuntime('known'));
 
-		$first = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
-			$order[] = 'first';
-			$result  = $next();
-			$order[] = 'first-after';
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage("No compiled operation found for id 'unknown'.");
 
-			return $result;
-		};
-
-		$second = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$order): mixed {
-			$order[] = 'second';
-			$result  = $next();
-			$order[] = 'second-after';
-
-			return $result;
-		};
-
-		$runtime = $this->makeCompiledRuntime('greet', [$first, $second]);
-		$engine  = new ExecutionEngine(new Invoker($runtime), runtime: $runtime);
-
-		$engine->execute($this->makeRealOperation('greet'), $this->makeContext());
-
-		$this->assertSame(['first', 'second', 'second-after', 'first-after'], $order);
+		$engine->execute($this->makeOp('unknown'), $this->makeCtx());
 	}
 
-	public function testGlobalMiddlewaresUsedWhenNoRuntime(): void
+	// ── InterceptorPipeline wraps ExecutionPipeline ───────────────────────────
+
+	public function testInterceptorWrapsEntireExecution(): void
 	{
-		$ran     = false;
-		$invoker = $this->createStub(InvokerInterface::class);
-		$invoker->method('invoke')->willReturn('ok');
+		$log         = [];
+		$interceptor = new class ($log) implements ExecutionInterceptorInterface {
+			/** @param list<string> $log */
+			public function __construct(private array &$log) {}
 
-		$mw     = function (OperationInterface $op, OperationContextInterface $ctx, callable $next) use (&$ran): mixed {
-			$ran = true;
+			public function intercept(object $context, callable $next): mixed
+			{
+				$this->log[] = 'before';
+				$result       = $next();
+				$this->log[] = 'after';
 
-			return $next();
+				return $result;
+			}
 		};
 
-		$engine = new ExecutionEngine($invoker, [$mw]);
-		$engine->execute($this->makeOperation(), $this->makeContext());
+		$op = new CompiledOperation('op', 0, 0, 0, 0);
 
-		$this->assertTrue($ran);
+		$execPipeline = new CompiledExecutionPipeline(
+			handlers: [0 => static function () use (&$log): string {
+				$log[] = 'handler';
+				return 'result';
+			}],
+			argumentPlans: [0 => new ArgumentResolutionPlan([])],
+			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
+
+		$runtime = new CompiledRuntime(
+			executionPipeline: $execPipeline,
+			interceptorPipeline: new CompiledInterceptorPipeline([$interceptor]),
+			operations: OperationRepository::build([$op]),
+		);
+
+		$engine = new ExecutionEngine($runtime);
+		$result = $engine->execute($this->makeOp(), $this->makeCtx());
+
+		$this->assertSame(['before', 'handler', 'after'], $log);
+		$this->assertSame('result', $result);
+	}
+
+	public function testInterceptorObservesExceptionFromHandler(): void
+	{
+		$observed    = false;
+		$interceptor = new class ($observed) implements ExecutionInterceptorInterface {
+			public function __construct(private bool &$observed) {}
+
+			public function intercept(object $context, callable $next): mixed
+			{
+				try {
+					return $next();
+				} catch (\Throwable) {
+					$this->observed = true;
+					throw new \RuntimeException('Wrapped by interceptor.');
+				}
+			}
+		};
+
+		$op = new CompiledOperation('op', 0, 0, 0, 0);
+
+		$execPipeline = new CompiledExecutionPipeline(
+			handlers: [0 => static fn (): never => throw new \RuntimeException('handler blew up')],
+			argumentPlans: [0 => new ArgumentResolutionPlan([])],
+			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
+
+		$runtime = new CompiledRuntime(
+			executionPipeline: $execPipeline,
+			interceptorPipeline: new CompiledInterceptorPipeline([$interceptor]),
+			operations: OperationRepository::build([$op]),
+		);
+
+		$engine = new ExecutionEngine($runtime);
+
+		try {
+			$engine->execute($this->makeOp(), $this->makeCtx());
+		} catch (\RuntimeException $e) {
+			$this->assertSame('Wrapped by interceptor.', $e->getMessage());
+			$this->assertTrue($observed);
+
+			return;
+		}
+
+		$this->fail('Expected RuntimeException was not thrown.');
+	}
+
+	public function testInterceptorBlockingPreventsHandlerExecution(): void
+	{
+		$handlerCalled = false;
+
+		$blocking = new class () implements ExecutionInterceptorInterface {
+			public function intercept(object $context, callable $next): mixed
+			{
+				throw new \RuntimeException('Interceptor blocked execution.');
+			}
+		};
+
+		$op = new CompiledOperation('op', 0, 0, 0, 0);
+
+		$execPipeline = new CompiledExecutionPipeline(
+			handlers: [0 => static function () use (&$handlerCalled): string {
+				$handlerCalled = true;
+
+				return 'should not run';
+			}],
+			argumentPlans: [0 => new ArgumentResolutionPlan([])],
+			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
+
+		$runtime = new CompiledRuntime(
+			executionPipeline: $execPipeline,
+			interceptorPipeline: new CompiledInterceptorPipeline([$blocking]),
+			operations: OperationRepository::build([$op]),
+		);
+
+		$engine = new ExecutionEngine($runtime);
+
+		try {
+			$engine->execute($this->makeOp(), $this->makeCtx());
+		} catch (\RuntimeException) {
+		}
+
+		$this->assertFalse($handlerCalled);
+	}
+
+	// ── End-to-end via builder ────────────────────────────────────────────────
+
+	public function testBuilderProducesWorkingEngine(): void
+	{
+		$model = new ApplicationModel();
+		$model->add(new OperationDefinition('greet', 'Greet', static fn (): string => 'hello'));
+
+		$engine = (new DefaultRuntimeBuilder())->build($model);
+		$op     = $this->makeOp('greet');
+		$result = $engine->execute($op, $this->makeCtx());
+
+		$this->assertSame('hello', $result);
 	}
 }
