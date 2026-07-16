@@ -8,6 +8,7 @@ use Rokke\Runtime\Build\ApplicationModel;
 use Rokke\Runtime\Build\ArgumentPlanCompiler;
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
+use Rokke\Runtime\Build\HandlerCompiler;
 use Rokke\Runtime\Build\OperationDefinition;
 use Rokke\Runtime\Build\ResultPlanCompiler;
 use Rokke\Runtime\Build\ServiceDescriptor;
@@ -30,6 +31,7 @@ final class DefaultRuntimeBuilder
 			new FactoryCompiler(),
 		);
 
+		$handlerCompiler   = new HandlerCompiler();
 		$argCompiler       = new ArgumentPlanCompiler();
 		$resultCompiler    = new ResultPlanCompiler();
 		$handlers          = [];
@@ -39,7 +41,7 @@ final class DefaultRuntimeBuilder
 		$compiledOps       = [];
 
 		foreach ($model->definitions(OperationDefinition::class) as $index => $definition) {
-			$handlers[$index]      = $definition->handler;
+			$handlers[$index]      = $handlerCompiler->compile($definition->handler, $factories);
 			$argumentPlans[$index] = $argCompiler->compile($definition->handler, $factories);
 			$resultPlans[$index]   = $resultCompiler->compile($definition->handler);
 

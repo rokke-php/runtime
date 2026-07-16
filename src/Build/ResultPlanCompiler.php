@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Build;
 
-use ReflectionFunction;
 use ReflectionIntersectionType;
+use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionUnionType;
 use Rokke\Runtime\Compiled\Results\NeverResultInstruction;
@@ -21,9 +21,10 @@ final class ResultPlanCompiler
 	/** @param ResultSourceCompilerInterface[] $sources */
 	public function __construct(private readonly array $sources = []) {}
 
-	public function compile(callable $handler): ResultResolutionPlan
+	/** @param class-string $handlerClass */
+	public function compile(string $handlerClass): ResultResolutionPlan
 	{
-		$reflection = new ReflectionFunction(\Closure::fromCallable($handler));
+		$reflection = new ReflectionMethod($handlerClass, '__invoke');
 		$returnType = $reflection->getReturnType();
 
 		if ($returnType === null) {

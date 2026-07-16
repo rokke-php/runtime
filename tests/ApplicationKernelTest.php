@@ -13,9 +13,114 @@ use Rokke\Runtime\ApplicationKernel;
 use Rokke\Runtime\Build\OperationCapability;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
+// ── Shared fixture types ───────────────────────────────────────────────────────
 
 final class KernelServiceFixture {}
+
+// ── Handler fixtures ──────────────────────────────────────────────────────────
+
+final class KernelGreetHandler
+{
+	public function __invoke(): string
+	{
+		return 'Hello Rokke';
+	}
+}
+
+final class KernelOpAHandler
+{
+	public function __invoke(): string
+	{
+		return 'result-a';
+	}
+}
+
+final class KernelOpBHandler
+{
+	public function __invoke(): string
+	{
+		return 'result-b';
+	}
+}
+
+final class KernelServiceInjectHandler
+{
+	public function __invoke(KernelServiceFixture $svc): string
+	{
+		return 'got:' . $svc::class;
+	}
+}
+
+final class KernelServiceAndContextHandler
+{
+	public function __invoke(KernelServiceFixture $svc, OperationContextInterface $ctx): string
+	{
+		return 'svc:' . $svc::class . '|ctx';
+	}
+}
+
+final class KernelUntypedHandler
+{
+	public function __invoke()
+	{
+		return 'no type';
+	}
+}
+
+final class KernelVoidHandler
+{
+	public function __invoke(): void {}
+}
+
+final class KernelDtoHandler
+{
+	public function __invoke(): KernelServiceFixture
+	{
+		return new KernelServiceFixture();
+	}
+}
+
+final class KernelDiscoveredHandler
+{
+	public function __invoke(): string
+	{
+		return 'from-discovery';
+	}
+}
+
+final class KernelExplicitHandler
+{
+	public function __invoke(): string
+	{
+		return 'explicit';
+	}
+}
+
+final class KernelAutoHandler
+{
+	public function __invoke(): string
+	{
+		return 'auto';
+	}
+}
+
+final class KernelExtAHandler
+{
+	public function __invoke(): string
+	{
+		return 'a';
+	}
+}
+
+final class KernelExtBHandler
+{
+	public function __invoke(): string
+	{
+		return 'b';
+	}
+}
+
+// ── Extension fixtures ────────────────────────────────────────────────────────
 
 final class GreetExtension implements ExtensionInterface
 {
@@ -24,7 +129,7 @@ final class GreetExtension implements ExtensionInterface
 		$builder->addCapability(new OperationCapability(
 			id: 'greet',
 			name: 'Greet',
-			handler: static fn (): string => 'Hello Rokke',
+			handler: KernelGreetHandler::class,
 		));
 	}
 }
@@ -33,8 +138,8 @@ final class MultiOpExtension implements ExtensionInterface
 {
 	public function register(ExtensionBuilderInterface $builder): void
 	{
-		$builder->addCapability(new OperationCapability('op.a', 'A', static fn (): string => 'result-a'));
-		$builder->addCapability(new OperationCapability('op.b', 'B', static fn (): string => 'result-b'));
+		$builder->addCapability(new OperationCapability('op.a', 'A', KernelOpAHandler::class));
+		$builder->addCapability(new OperationCapability('op.b', 'B', KernelOpBHandler::class));
 	}
 }
 
@@ -108,9 +213,7 @@ final class ApplicationKernelTest extends TestCase
 				$builder->addCapability(new OperationCapability(
 					id: 'inject',
 					name: 'Inject',
-					handler: static function (KernelServiceFixture $svc): string {
-						return 'got:' . $svc::class;
-					},
+					handler: KernelServiceInjectHandler::class,
 				));
 			}
 		});
@@ -129,9 +232,7 @@ final class ApplicationKernelTest extends TestCase
 				$builder->addCapability(new OperationCapability(
 					id: 'both',
 					name: 'Both',
-					handler: static function (KernelServiceFixture $svc, OperationContextInterface $ctx): string {
-						return 'svc:' . $svc::class . '|ctx';
-					},
+					handler: KernelServiceAndContextHandler::class,
 				));
 			}
 		});
@@ -149,7 +250,7 @@ final class ApplicationKernelTest extends TestCase
 				$builder->addCapability(new OperationCapability(
 					id: 'untyped',
 					name: 'Untyped',
-					handler: static fn () => 'no type',
+					handler: KernelUntypedHandler::class,
 				));
 			}
 		});
@@ -167,7 +268,7 @@ final class ApplicationKernelTest extends TestCase
 				$builder->addCapability(new OperationCapability(
 					id: 'void',
 					name: 'Void',
-					handler: static function (): void {},
+					handler: KernelVoidHandler::class,
 				));
 			}
 		});
@@ -178,26 +279,20 @@ final class ApplicationKernelTest extends TestCase
 
 	public function testHandlerReturningDtoPassesThroughUnmodified(): void
 	{
-		$expected = new KernelServiceFixture();
-		$kernel   = new ApplicationKernel();
-		$kernel->register(new class ($expected) implements ExtensionInterface {
-			public function __construct(private readonly KernelServiceFixture $dto) {}
-
+		$kernel = new ApplicationKernel();
+		$kernel->register(new class () implements ExtensionInterface {
 			public function register(ExtensionBuilderInterface $builder): void
 			{
-				$dto = $this->dto;
 				$builder->addCapability(new OperationCapability(
 					id: 'dto',
 					name: 'DTO',
-					handler: static function () use ($dto): KernelServiceFixture {
-						return $dto;
-					},
+					handler: KernelDtoHandler::class,
 				));
 			}
 		});
 		$kernel->build();
 
-		$this->assertSame($expected, $kernel->run('dto'));
+		$this->assertInstanceOf(KernelServiceFixture::class, $kernel->run('dto'));
 	}
 
 	public function testDiscoveredCapabilitiesAreCompiledAndRunnable(): void
@@ -211,7 +306,7 @@ final class ApplicationKernelTest extends TestCase
 					public function discover(): array
 					{
 						return [
-							new OperationCapability('discovered.op', 'Discovered', static fn (): string => 'from-discovery'),
+							new OperationCapability('discovered.op', 'Discovered', KernelDiscoveredHandler::class),
 						];
 					}
 				});
@@ -228,13 +323,13 @@ final class ApplicationKernelTest extends TestCase
 		$kernel->register(new class () implements ExtensionInterface {
 			public function register(ExtensionBuilderInterface $builder): void
 			{
-				$builder->addCapability(new OperationCapability('explicit.op', 'Explicit', static fn (): string => 'explicit'));
+				$builder->addCapability(new OperationCapability('explicit.op', 'Explicit', KernelExplicitHandler::class));
 				$builder->addDiscoveryProvider(new class () implements DiscoveryProviderInterface {
 					/** @return list<CapabilityInterface> */
 					public function discover(): array
 					{
 						return [
-							new OperationCapability('auto.op', 'Auto', static fn (): string => 'auto'),
+							new OperationCapability('auto.op', 'Auto', KernelAutoHandler::class),
 						];
 					}
 				});
@@ -253,14 +348,14 @@ final class ApplicationKernelTest extends TestCase
 		$extA = new class () implements ExtensionInterface {
 			public function register(ExtensionBuilderInterface $builder): void
 			{
-				$builder->addCapability(new OperationCapability('ext-a', 'A', static fn (): string => 'a'));
+				$builder->addCapability(new OperationCapability('ext-a', 'A', KernelExtAHandler::class));
 			}
 		};
 
 		$extB = new class () implements ExtensionInterface {
 			public function register(ExtensionBuilderInterface $builder): void
 			{
-				$builder->addCapability(new OperationCapability('ext-b', 'B', static fn (): string => 'b'));
+				$builder->addCapability(new OperationCapability('ext-b', 'B', KernelExtBHandler::class));
 			}
 		};
 

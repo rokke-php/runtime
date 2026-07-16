@@ -13,7 +13,7 @@ use Rokke\Runtime\Contracts\ExecutionBehaviorInterface;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 
-// ── Fixtures ─────────────────────────────────────────────────────────────────
+// ── Behavior fixtures ─────────────────────────────────────────────────────────
 
 final class RecordingBehavior implements ExecutionBehaviorInterface
 {
@@ -74,10 +74,105 @@ final class ContextCapturingBehavior implements ExecutionBehaviorInterface
 	}
 }
 
+// ── Handler fixtures ──────────────────────────────────────────────────────────
+
+final class BehaviorLogHandler
+{
+	/** @var list<string> */
+	public static array $log = [];
+
+	public function __invoke(): string
+	{
+		self::$log[] = 'handler';
+
+		return 'result';
+	}
+}
+
+final class BehaviorBlockedHandler
+{
+	public static bool $called = false;
+
+	public function __invoke(): string
+	{
+		self::$called = true;
+
+		return 'should not reach';
+	}
+}
+
+final class BehaviorDoneHandler
+{
+	public function __invoke(): string
+	{
+		return 'done';
+	}
+}
+
+final class BehaviorValueHandler
+{
+	public function __invoke(): string
+	{
+		return 'value';
+	}
+}
+
+final class BehaviorPlainHandler
+{
+	public function __invoke(): string
+	{
+		return 'plain';
+	}
+}
+
+final class BehaviorGuardedResultHandler
+{
+	public function __invoke(): string
+	{
+		return 'guarded-result';
+	}
+}
+
+final class BehaviorPlainResultHandler
+{
+	public function __invoke(): string
+	{
+		return 'plain-result';
+	}
+}
+
+final class BehaviorOkHandler
+{
+	public function __invoke(): string
+	{
+		return 'ok';
+	}
+}
+
+final class BehaviorOrderHandler
+{
+	/** @var list<string> */
+	public static array $order = [];
+
+	public function __invoke(): string
+	{
+		self::$order[] = 'handler';
+
+		return 'done';
+	}
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 final class BehaviorPipelineTest extends TestCase
 {
+	protected function setUp(): void
+	{
+		BehaviorLogHandler::$log       = [];
+		BehaviorBlockedHandler::$called = false;
+		BehaviorOrderHandler::$order   = [];
+	}
+
 	private function makeOp(string $id = 'op'): OperationInterface
 	{
 		$op = $this->createStub(OperationInterface::class);
@@ -95,18 +190,13 @@ final class BehaviorPipelineTest extends TestCase
 
 	public function testBehaviorExecutesBeforeHandler(): void
 	{
-		$handlerLog = [];
-		$behavior   = new LoggingBehavior();
+		$behavior = new LoggingBehavior();
 
 		$model = new ApplicationModel();
 		$model->add(new OperationDefinition(
 			id: 'op',
 			name: 'Op',
-			handler: static function () use (&$handlerLog): string {
-				$handlerLog[] = 'handler';
-
-				return 'result';
-			},
+			handler: BehaviorLogHandler::class,
 			behaviors: [new BehaviorDescriptor($behavior)],
 		));
 
@@ -114,23 +204,17 @@ final class BehaviorPipelineTest extends TestCase
 		$result  = $runtime->execute($this->makeOp(), $this->makeCtx());
 
 		$this->assertSame(['behavior:before', 'behavior:after'], $behavior->log);
-		$this->assertSame(['handler'], $handlerLog);
+		$this->assertSame(['handler'], BehaviorLogHandler::$log);
 		$this->assertSame('result', $result);
 	}
 
 	public function testBlockingBehaviorPreventsHandlerExecution(): void
 	{
-		$handlerCalled = false;
-
 		$model = new ApplicationModel();
 		$model->add(new OperationDefinition(
 			id: 'op',
 			name: 'Op',
-			handler: static function () use (&$handlerCalled): string {
-				$handlerCalled = true;
-
-				return 'should not reach';
-			},
+			handler: BehaviorBlockedHandler::class,
 			behaviors: [new BehaviorDescriptor(new BlockingBehavior())],
 		));
 
@@ -139,7 +223,7 @@ final class BehaviorPipelineTest extends TestCase
 
 		(new DefaultRuntimeBuilder())->build($model)->execute($this->makeOp(), $this->makeCtx());
 
-		$this->assertFalse($handlerCalled);
+		$this->assertFalse(BehaviorBlockedHandler::$called);
 	}
 
 	public function testBehaviorsExecuteInDeclaredOrder(): void
@@ -151,7 +235,7 @@ final class BehaviorPipelineTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'op',
 			name: 'Op',
-			handler: static fn (): string => 'done',
+			handler: BehaviorDoneHandler::class,
 			behaviors: [
 				new BehaviorDescriptor($first),
 				new BehaviorDescriptor($second),
@@ -170,7 +254,7 @@ final class BehaviorPipelineTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'op',
 			name: 'Op',
-			handler: static fn (): string => 'value',
+			handler: BehaviorValueHandler::class,
 			behaviors: [new BehaviorDescriptor(new MutatingBehavior())],
 		));
 
@@ -187,7 +271,7 @@ final class BehaviorPipelineTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'op',
 			name: 'Op',
-			handler: static fn (): string => 'plain',
+			handler: BehaviorPlainHandler::class,
 		));
 
 		$result = (new DefaultRuntimeBuilder())->build($model)->execute($this->makeOp(), $this->makeCtx());
@@ -203,13 +287,13 @@ final class BehaviorPipelineTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'guarded',
 			name: 'Guarded',
-			handler: static fn (): string => 'guarded-result',
+			handler: BehaviorGuardedResultHandler::class,
 			behaviors: [new BehaviorDescriptor($behavior)],
 		));
 		$model->add(new OperationDefinition(
 			id: 'plain',
 			name: 'Plain',
-			handler: static fn (): string => 'plain-result',
+			handler: BehaviorPlainResultHandler::class,
 		));
 
 		$runtime = (new DefaultRuntimeBuilder())->build($model);
@@ -233,7 +317,7 @@ final class BehaviorPipelineTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'op',
 			name: 'Op',
-			handler: static fn (): string => 'ok',
+			handler: BehaviorOkHandler::class,
 			behaviors: [new BehaviorDescriptor($behavior)],
 		));
 
@@ -246,7 +330,6 @@ final class BehaviorPipelineTest extends TestCase
 
 	public function testFirstBehaviorWrapsSecondAsMiddlewareChain(): void
 	{
-		$order  = [];
 		$first  = new LoggingBehavior('outer');
 		$second = new LoggingBehavior('inner');
 
@@ -254,11 +337,7 @@ final class BehaviorPipelineTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'op',
 			name: 'Op',
-			handler: static function () use (&$order): string {
-				$order[] = 'handler';
-
-				return 'done';
-			},
+			handler: BehaviorOrderHandler::class,
 			behaviors: [
 				new BehaviorDescriptor($first),
 				new BehaviorDescriptor($second),
@@ -269,6 +348,6 @@ final class BehaviorPipelineTest extends TestCase
 
 		$this->assertSame(['outer:before', 'outer:after'], $first->log);
 		$this->assertSame(['inner:before', 'inner:after'], $second->log);
-		$this->assertSame(['handler'], $order);
+		$this->assertSame(['handler'], BehaviorOrderHandler::$order);
 	}
 }

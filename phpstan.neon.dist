@@ -71,3 +71,16 @@ parameters:
         # context when PHPStan analyses the closure body; the runtime type is correct.
         - message: '#Cannot access an offset on mixed#'
           path: tests/*
+
+        # Intentional "no type" fixture handlers in tests exercise compiler error paths.
+        - message: '#Method .* has no return type specified#'
+          path: tests/*
+        - message: '#Method .* has parameter \$\w+ with no type specified#'
+          path: tests/*
+        - message: '#has no value type specified in iterable type array#'
+          path: tests/*
+
+        # HandlerCompiler compiles class-strings whose __invoke makes them callable;
+        # PHPStan cannot prove object is callable without narrow type information.
+        - message: '#Trying to invoke object but it might not be a callable#'
+          path: src/Build/HandlerCompiler.php

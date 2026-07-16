@@ -14,7 +14,7 @@ use Rokke\Runtime\Compiled\Results\ResultInstructionInterface;
 use Rokke\Runtime\Compiled\Results\ScalarResultInstruction;
 use Rokke\Runtime\Compiled\Results\VoidResultInstruction;
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
+// ── Value fixtures ─────────────────────────────────────────────────────────────
 
 final class ResultPlanDto {}
 
@@ -38,6 +38,101 @@ final class StubResultSourceCompiler implements ResultSourceCompilerInterface
 	}
 }
 
+// ── Handler fixtures ──────────────────────────────────────────────────────────
+
+final class ResultStringHandler
+{
+	public function __invoke(): string
+	{
+		return 'ok';
+	}
+}
+
+final class ResultIntHandler
+{
+	public function __invoke(): int
+	{
+		return 0;
+	}
+}
+
+final class ResultFloatHandler
+{
+	public function __invoke(): float
+	{
+		return 0.0;
+	}
+}
+
+final class ResultBoolHandler
+{
+	public function __invoke(): bool
+	{
+		return true;
+	}
+}
+
+final class ResultArrayHandler
+{
+	public function __invoke(): array
+	{
+		return [];
+	}
+}
+
+final class ResultDtoHandler
+{
+	public function __invoke(): ResultPlanDto
+	{
+		return new ResultPlanDto();
+	}
+}
+
+final class ResultStdClassHandler
+{
+	public function __invoke(): \stdClass
+	{
+		return new \stdClass();
+	}
+}
+
+final class ResultVoidHandler
+{
+	public function __invoke(): void {}
+}
+
+final class ResultNeverHandler
+{
+	public function __invoke(): never
+	{
+		throw new \RuntimeException();
+	}
+}
+
+final class ResultNoTypeHandler
+{
+	public function __invoke()
+	{
+		return 'no type';
+	}
+}
+
+final class ResultMixedHandler
+{
+	public function __invoke(): mixed
+	{
+		return null;
+	}
+}
+
+final class ResultUnionHandler
+{
+	public function __invoke(): string|int
+	{
+		return 'x';
+	}
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 final class ResultPlanCompilerTest extends TestCase
@@ -53,7 +148,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testStringReturnTypeProducesScalarInstruction(): void
 	{
-		$plan = $this->compiler->compile(static fn (): string => 'ok');
+		$plan = $this->compiler->compile(ResultStringHandler::class);
 
 		$this->assertInstanceOf(ScalarResultInstruction::class, $plan->instruction);
 		assert($plan->instruction instanceof ScalarResultInstruction);
@@ -62,7 +157,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testIntReturnTypeProducesScalarInstruction(): void
 	{
-		$plan = $this->compiler->compile(static fn (): int => 0);
+		$plan = $this->compiler->compile(ResultIntHandler::class);
 
 		$this->assertInstanceOf(ScalarResultInstruction::class, $plan->instruction);
 		assert($plan->instruction instanceof ScalarResultInstruction);
@@ -71,7 +166,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testFloatReturnTypeProducesScalarInstruction(): void
 	{
-		$plan = $this->compiler->compile(static fn (): float => 0.0);
+		$plan = $this->compiler->compile(ResultFloatHandler::class);
 
 		$this->assertInstanceOf(ScalarResultInstruction::class, $plan->instruction);
 		assert($plan->instruction instanceof ScalarResultInstruction);
@@ -80,7 +175,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testBoolReturnTypeProducesScalarInstruction(): void
 	{
-		$plan = $this->compiler->compile(static fn (): bool => true);
+		$plan = $this->compiler->compile(ResultBoolHandler::class);
 
 		$this->assertInstanceOf(ScalarResultInstruction::class, $plan->instruction);
 		assert($plan->instruction instanceof ScalarResultInstruction);
@@ -89,7 +184,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testArrayReturnTypeProducesScalarInstruction(): void
 	{
-		$plan = $this->compiler->compile(static fn (): array => []);
+		$plan = $this->compiler->compile(ResultArrayHandler::class);
 
 		$this->assertInstanceOf(ScalarResultInstruction::class, $plan->instruction);
 		assert($plan->instruction instanceof ScalarResultInstruction);
@@ -100,7 +195,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testNamedClassReturnTypeProducesObjectInstruction(): void
 	{
-		$plan = $this->compiler->compile(static fn (): ResultPlanDto => new ResultPlanDto());
+		$plan = $this->compiler->compile(ResultDtoHandler::class);
 
 		$this->assertInstanceOf(ObjectResultInstruction::class, $plan->instruction);
 		assert($plan->instruction instanceof ObjectResultInstruction);
@@ -109,7 +204,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testSelfReturnTypeProducesObjectInstruction(): void
 	{
-		$plan = $this->compiler->compile(static fn (): \stdClass => new \stdClass());
+		$plan = $this->compiler->compile(ResultStdClassHandler::class);
 
 		$this->assertInstanceOf(ObjectResultInstruction::class, $plan->instruction);
 	}
@@ -118,16 +213,14 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testVoidReturnTypeProducesVoidInstruction(): void
 	{
-		$plan = $this->compiler->compile(static function (): void {});
+		$plan = $this->compiler->compile(ResultVoidHandler::class);
 
 		$this->assertInstanceOf(VoidResultInstruction::class, $plan->instruction);
 	}
 
 	public function testNeverReturnTypeProducesNeverInstruction(): void
 	{
-		$plan = $this->compiler->compile(static function (): never {
-			throw new \RuntimeException();
-		});
+		$plan = $this->compiler->compile(ResultNeverHandler::class);
 
 		$this->assertInstanceOf(NeverResultInstruction::class, $plan->instruction);
 	}
@@ -139,7 +232,7 @@ final class ResultPlanCompilerTest extends TestCase
 		$this->expectException(\RuntimeException::class);
 		$this->expectExceptionMessage('Output Contract');
 
-		$this->compiler->compile(static fn () => 'no type');
+		$this->compiler->compile(ResultNoTypeHandler::class);
 	}
 
 	public function testMixedReturnTypeThrowsAtCompileTime(): void
@@ -147,7 +240,7 @@ final class ResultPlanCompilerTest extends TestCase
 		$this->expectException(\RuntimeException::class);
 		$this->expectExceptionMessage("'mixed'");
 
-		$this->compiler->compile(static fn (): mixed => null);
+		$this->compiler->compile(ResultMixedHandler::class);
 	}
 
 	public function testUnionReturnTypeThrowsAtCompileTime(): void
@@ -155,11 +248,7 @@ final class ResultPlanCompilerTest extends TestCase
 		$this->expectException(\RuntimeException::class);
 		$this->expectExceptionMessage('Union');
 
-		$fn = static function (): string|int {
-			/** @var string|int */
-			return 'x';
-		};
-		$this->compiler->compile($fn);
+		$this->compiler->compile(ResultUnionHandler::class);
 	}
 
 	// ── Custom sources ────────────────────────────────────────────────────────
@@ -169,7 +258,7 @@ final class ResultPlanCompilerTest extends TestCase
 		$compiler = new ResultPlanCompiler([new StubResultSourceCompiler()]);
 		$dto      = new ResultPlanDto();
 
-		$plan = $compiler->compile(static fn (): ResultPlanDto => $dto);
+		$plan = $compiler->compile(ResultDtoHandler::class);
 
 		$this->assertInstanceOf(StubResultInstruction::class, $plan->instruction);
 		$this->assertSame('stub', $plan->resolve($dto));
@@ -179,14 +268,14 @@ final class ResultPlanCompilerTest extends TestCase
 	{
 		$compiler = new ResultPlanCompiler([new StubResultSourceCompiler()]);
 
-		$plan = $compiler->compile(static fn (): string => 'ok');
+		$plan = $compiler->compile(ResultStringHandler::class);
 
 		$this->assertInstanceOf(ScalarResultInstruction::class, $plan->instruction);
 	}
 
 	public function testDefaultCompilerStillWorksWithNoSources(): void
 	{
-		$plan = $this->compiler->compile(static fn (): ResultPlanDto => new ResultPlanDto());
+		$plan = $this->compiler->compile(ResultDtoHandler::class);
 
 		$this->assertInstanceOf(ObjectResultInstruction::class, $plan->instruction);
 	}
@@ -195,7 +284,7 @@ final class ResultPlanCompilerTest extends TestCase
 
 	public function testCompiledPlanResolvesValue(): void
 	{
-		$plan = $this->compiler->compile(static fn (): string => 'ok');
+		$plan = $this->compiler->compile(ResultStringHandler::class);
 
 		$this->assertSame('result', $plan->resolve('result'));
 	}
@@ -203,7 +292,7 @@ final class ResultPlanCompilerTest extends TestCase
 	public function testCompiledPlanResolvesObject(): void
 	{
 		$dto  = new ResultPlanDto();
-		$plan = $this->compiler->compile(static fn (): ResultPlanDto => $dto);
+		$plan = $this->compiler->compile(ResultDtoHandler::class);
 
 		$this->assertSame($dto, $plan->resolve($dto));
 	}

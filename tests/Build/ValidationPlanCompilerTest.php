@@ -15,35 +15,62 @@ use Rokke\Runtime\Build\ValidationPlanCompiler;
 use Rokke\Runtime\Compiled\ValidationPlan;
 use Rokke\Runtime\Exception\ValidationException;
 
-// ── Fixture handlers ──────────────────────────────────────────────────────────
+// ── Handler fixtures ──────────────────────────────────────────────────────────
 
-function noArgsHandler(): string
+final class ValNoArgsHandler
 {
-	return 'ok';
+	public function __invoke(): string
+	{
+		return 'ok';
+	}
 }
-function plainStringHandler(string $name): string
+
+final class ValPlainStringHandler
 {
-	return $name;
+	public function __invoke(string $name): string
+	{
+		return $name;
+	}
 }
-function notBlankHandler(#[NotBlank] string $name): string
+
+final class ValNotBlankHandler
 {
-	return $name;
+	public function __invoke(#[NotBlank] string $name): string
+	{
+		return $name;
+	}
 }
-function minHandler(#[Min(5)] int $value): int
+
+final class ValMinHandler
 {
-	return $value;
+	public function __invoke(#[Min(5)] int $value): int
+	{
+		return $value;
+	}
 }
-function maxHandler(#[Max(10)] int $value): int
+
+final class ValMaxHandler
 {
-	return $value;
+	public function __invoke(#[Max(10)] int $value): int
+	{
+		return $value;
+	}
 }
-function multiAttrHandler(#[NotBlank] #[Min(1)] #[Max(99)] string $score): string
+
+final class ValMultiAttrHandler
 {
-	return $score;
+	public function __invoke(#[NotBlank] #[Min(1)] #[Max(99)] string $score): string
+	{
+		return $score;
+	}
 }
-function multiParamHandler(#[NotBlank] string $name, #[Min(0)] int $age): string
+
+final class ValMultiParamHandler
 {
-	return "{$name}:{$age}";
+	public function __invoke(#[NotBlank] string $name, #[Min(0)] int $age): string
+	{
+		return "{$name}:{$age}";
+	}
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -63,7 +90,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testEmptyHandlerProducesEmptyPlan(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\noArgsHandler');
+		$plan = $this->compiler->compile(ValNoArgsHandler::class);
 
 		$this->assertInstanceOf(ValidationPlan::class, $plan);
 		$this->assertTrue($plan->isEmpty());
@@ -71,23 +98,22 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testParamWithNoAttributeProducesEmptyPlan(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\plainStringHandler');
+		$plan = $this->compiler->compile(ValPlainStringHandler::class);
 
 		$this->assertTrue($plan->isEmpty());
 	}
 
 	public function testNotBlankPassesForNonEmptyString(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\notBlankHandler');
+		$plan = $this->compiler->compile(ValNotBlankHandler::class);
 
 		$this->assertFalse($plan->isEmpty());
 		$plan->validate(['Fernando']);
-		// no exception = pass
 	}
 
 	public function testNotBlankThrowsForEmptyString(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\notBlankHandler');
+		$plan = $this->compiler->compile(ValNotBlankHandler::class);
 
 		$this->expectException(ValidationException::class);
 		$plan->validate(['']);
@@ -95,7 +121,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testNotBlankThrowsForWhitespaceOnlyString(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\notBlankHandler');
+		$plan = $this->compiler->compile(ValNotBlankHandler::class);
 
 		$this->expectException(ValidationException::class);
 		$plan->validate(['   ']);
@@ -103,7 +129,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMinPassesAtThreshold(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\minHandler');
+		$plan = $this->compiler->compile(ValMinHandler::class);
 
 		$this->assertFalse($plan->isEmpty());
 		$plan->validate([5]);
@@ -111,7 +137,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMinThrowsBelowThreshold(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\minHandler');
+		$plan = $this->compiler->compile(ValMinHandler::class);
 
 		$this->expectException(ValidationException::class);
 		$plan->validate([4]);
@@ -119,7 +145,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMaxPassesAtThreshold(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\maxHandler');
+		$plan = $this->compiler->compile(ValMaxHandler::class);
 
 		$this->assertFalse($plan->isEmpty());
 		$plan->validate([10]);
@@ -127,7 +153,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMaxThrowsAboveThreshold(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\maxHandler');
+		$plan = $this->compiler->compile(ValMaxHandler::class);
 
 		$this->expectException(ValidationException::class);
 		$plan->validate([11]);
@@ -135,7 +161,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMultipleAttributesOnSameParam(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\multiAttrHandler');
+		$plan = $this->compiler->compile(ValMultiAttrHandler::class);
 
 		$this->assertFalse($plan->isEmpty());
 		$plan->validate(['42']);
@@ -143,7 +169,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMultipleAttributesFirstFailureThrows(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\multiAttrHandler');
+		$plan = $this->compiler->compile(ValMultiAttrHandler::class);
 
 		$this->expectException(ValidationException::class);
 		$plan->validate(['']);
@@ -151,7 +177,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMultipleParamsEachValidated(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\multiParamHandler');
+		$plan = $this->compiler->compile(ValMultiParamHandler::class);
 
 		$this->assertFalse($plan->isEmpty());
 		$plan->validate(['Alice', 30]);
@@ -159,7 +185,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testMultipleParamsSecondParamFailureThrows(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\multiParamHandler');
+		$plan = $this->compiler->compile(ValMultiParamHandler::class);
 
 		$this->expectException(ValidationException::class);
 		$plan->validate(['Alice', -1]);
@@ -167,7 +193,7 @@ final class ValidationPlanCompilerTest extends TestCase
 
 	public function testValidationExceptionCarriesParamName(): void
 	{
-		$plan = $this->compiler->compile('Rokke\Runtime\Tests\Build\notBlankHandler');
+		$plan = $this->compiler->compile(ValNotBlankHandler::class);
 
 		try {
 			$plan->validate(['']);
