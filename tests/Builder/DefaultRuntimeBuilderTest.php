@@ -9,6 +9,9 @@ use Rokke\Runtime\Build\ApplicationModel;
 use Rokke\Runtime\Build\OperationDefinition;
 use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Builder\DefaultRuntimeBuilder;
+use Rokke\Runtime\Contracts\OperationContextInterface;
+use Rokke\Runtime\Contracts\OperationInterface;
+use Rokke\Runtime\Contracts\RuntimeInterface;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -18,9 +21,42 @@ final class BuilderTestService
 {
 	public function __construct(public readonly BuilderTestDep $dep) {}
 }
-use Rokke\Runtime\Contracts\OperationContextInterface;
-use Rokke\Runtime\Contracts\OperationInterface;
-use Rokke\Runtime\Contracts\RuntimeInterface;
+
+final class BuilderHelloHandler
+{
+	public function __invoke(OperationContextInterface $ctx): string
+	{
+		return 'hello';
+	}
+}
+
+final class BuilderContextCaptureHandler
+{
+	public static ?OperationContextInterface $received = null;
+
+	public function __invoke(OperationContextInterface $ctx): void
+	{
+		self::$received = $ctx;
+	}
+}
+
+final class BuilderResultAHandler
+{
+	public function __invoke(): string
+	{
+		return 'result-a';
+	}
+}
+
+final class BuilderResultBHandler
+{
+	public function __invoke(): string
+	{
+		return 'result-b';
+	}
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 final class DefaultRuntimeBuilderTest extends TestCase
 {
@@ -28,7 +64,8 @@ final class DefaultRuntimeBuilderTest extends TestCase
 
 	protected function setUp(): void
 	{
-		$this->builder = new DefaultRuntimeBuilder();
+		$this->builder                         = new DefaultRuntimeBuilder();
+		BuilderContextCaptureHandler::$received = null;
 	}
 
 	private function makeOperation(string $id): OperationInterface
@@ -57,7 +94,7 @@ final class DefaultRuntimeBuilderTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'greet',
 			name: 'Greet',
-			handler: static fn (OperationContextInterface $ctx): string => 'hello',
+			handler: BuilderHelloHandler::class,
 		));
 
 		$runtime = $this->builder->build($model);
@@ -68,22 +105,19 @@ final class DefaultRuntimeBuilderTest extends TestCase
 
 	public function testBuiltRuntimePassesContextToHandler(): void
 	{
-		$ctx      = $this->makeContext();
-		$received = null;
+		$ctx = $this->makeContext();
 
 		$model = new ApplicationModel();
 		$model->add(new OperationDefinition(
 			id: 'capture',
 			name: 'Capture',
-			handler: static function (OperationContextInterface $c) use (&$received): void {
-				$received = $c;
-			},
+			handler: BuilderContextCaptureHandler::class,
 		));
 
 		$runtime = $this->builder->build($model);
 		$runtime->execute($this->makeOperation('capture'), $ctx);
 
-		$this->assertSame($ctx, $received);
+		$this->assertSame($ctx, BuilderContextCaptureHandler::$received);
 	}
 
 	public function testBuiltRuntimeThrowsForUnknownOperation(): void
@@ -108,7 +142,7 @@ final class DefaultRuntimeBuilderTest extends TestCase
 	public function testServicesAndOperationsCoexistInBuiltRuntime(): void
 	{
 		$model = new ApplicationModel();
-		$model->add(new OperationDefinition('greet', 'Greet', static fn (): string => 'hello'));
+		$model->add(new OperationDefinition('greet', 'Greet', BuilderHelloHandler::class));
 		$model->add(new ServiceDescriptor(DefaultRuntimeBuilder::class, DefaultRuntimeBuilder::class, [DefaultRuntimeBuilder::class]));
 
 		$runtime = $this->builder->build($model);
@@ -145,8 +179,8 @@ final class DefaultRuntimeBuilderTest extends TestCase
 	public function testMultipleOperationsAreIndependentlyExecutable(): void
 	{
 		$model = new ApplicationModel();
-		$model->add(new OperationDefinition('op.a', 'A', static fn (): string => 'result-a'));
-		$model->add(new OperationDefinition('op.b', 'B', static fn (): string => 'result-b'));
+		$model->add(new OperationDefinition('op.a', 'A', BuilderResultAHandler::class));
+		$model->add(new OperationDefinition('op.b', 'B', BuilderResultBHandler::class));
 
 		$runtime = $this->builder->build($model);
 

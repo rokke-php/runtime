@@ -21,6 +21,14 @@ use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Engine\ExecutionEngine;
 
+final class EngineHelloHandler
+{
+	public function __invoke(): string
+	{
+		return 'hello';
+	}
+}
+
 final class ExecutionEngineTest extends TestCase
 {
 	private function makeCtx(): OperationContextInterface
@@ -216,7 +224,7 @@ final class ExecutionEngineTest extends TestCase
 	public function testBuilderProducesWorkingEngine(): void
 	{
 		$model = new ApplicationModel();
-		$model->add(new OperationDefinition('greet', 'Greet', static fn (): string => 'hello'));
+		$model->add(new OperationDefinition('greet', 'Greet', EngineHelloHandler::class));
 
 		$engine = (new DefaultRuntimeBuilder())->build($model);
 		$op     = $this->makeOp('greet');

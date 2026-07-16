@@ -17,13 +17,71 @@ use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
 use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
+// ── Service fixtures ──────────────────────────────────────────────────────────
 
 final class PlanCompilerDep {}
 
 final class PlanCompilerService
 {
 	public function __construct(public readonly PlanCompilerDep $dep) {}
+}
+
+// ── Handler fixtures ──────────────────────────────────────────────────────────
+
+final class ArgNoParamHandler
+{
+	public function __invoke(): string
+	{
+		return 'ok';
+	}
+}
+
+final class ArgContextParamHandler
+{
+	public function __invoke(OperationContextInterface $ctx): string
+	{
+		return 'ok';
+	}
+}
+
+final class ArgDepParamHandler
+{
+	public function __invoke(PlanCompilerDep $dep): string
+	{
+		return 'ok';
+	}
+}
+
+final class ArgDepThenCtxHandler
+{
+	public function __invoke(PlanCompilerDep $dep, OperationContextInterface $ctx): string
+	{
+		return 'ok';
+	}
+}
+
+final class ArgCtxThenDepHandler
+{
+	public function __invoke(OperationContextInterface $ctx, PlanCompilerDep $dep): string
+	{
+		return 'ok';
+	}
+}
+
+final class ArgTypelessParamHandler
+{
+	public function __invoke($x): string
+	{
+		return 'ok';
+	}
+}
+
+final class ArgBuiltinParamHandler
+{
+	public function __invoke(string $name): string
+	{
+		return $name;
+	}
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -46,17 +104,14 @@ final class ArgumentPlanCompilerTest extends TestCase
 
 	public function testNoParametersProducesEmptyPlan(): void
 	{
-		$plan = $this->compiler->compile(static fn (): string => 'ok', $this->emptyRepo);
+		$plan = $this->compiler->compile(ArgNoParamHandler::class, $this->emptyRepo);
 
 		$this->assertCount(0, $plan->instructions);
 	}
 
 	public function testContextParameterProducesContextInstruction(): void
 	{
-		$plan = $this->compiler->compile(
-			static fn (OperationContextInterface $ctx): string => 'ok',
-			$this->emptyRepo,
-		);
+		$plan = $this->compiler->compile(ArgContextParamHandler::class, $this->emptyRepo);
 
 		$this->assertCount(1, $plan->instructions);
 		$this->assertInstanceOf(ContextArgumentInstruction::class, $plan->instructions[0]);
@@ -64,10 +119,7 @@ final class ArgumentPlanCompilerTest extends TestCase
 
 	public function testServiceParameterProducesFactoryInstruction(): void
 	{
-		$plan = $this->compiler->compile(
-			static fn (PlanCompilerDep $dep): string => 'ok',
-			$this->repoWithDep,
-		);
+		$plan = $this->compiler->compile(ArgDepParamHandler::class, $this->repoWithDep);
 
 		$this->assertCount(1, $plan->instructions);
 		$this->assertInstanceOf(FactoryArgumentInstruction::class, $plan->instructions[0]);
@@ -75,10 +127,7 @@ final class ArgumentPlanCompilerTest extends TestCase
 
 	public function testMixedParametersPreserveOrder(): void
 	{
-		$plan = $this->compiler->compile(
-			static fn (PlanCompilerDep $dep, OperationContextInterface $ctx): string => 'ok',
-			$this->repoWithDep,
-		);
+		$plan = $this->compiler->compile(ArgDepThenCtxHandler::class, $this->repoWithDep);
 
 		$this->assertCount(2, $plan->instructions);
 		$this->assertInstanceOf(FactoryArgumentInstruction::class, $plan->instructions[0]);
@@ -87,10 +136,7 @@ final class ArgumentPlanCompilerTest extends TestCase
 
 	public function testContextFirstThenServicePreservesOrder(): void
 	{
-		$plan = $this->compiler->compile(
-			static fn (OperationContextInterface $ctx, PlanCompilerDep $dep): string => 'ok',
-			$this->repoWithDep,
-		);
+		$plan = $this->compiler->compile(ArgCtxThenDepHandler::class, $this->repoWithDep);
 
 		$this->assertCount(2, $plan->instructions);
 		$this->assertInstanceOf(ContextArgumentInstruction::class, $plan->instructions[0]);
@@ -101,30 +147,21 @@ final class ArgumentPlanCompilerTest extends TestCase
 	{
 		$this->expectException(\RuntimeException::class);
 
-		$this->compiler->compile(
-			static fn (PlanCompilerDep $dep): string => 'ok',
-			$this->emptyRepo,
-		);
+		$this->compiler->compile(ArgDepParamHandler::class, $this->emptyRepo);
 	}
 
 	public function testTypelessParameterThrowsAtCompileTime(): void
 	{
 		$this->expectException(\RuntimeException::class);
 
-		$this->compiler->compile(
-			static fn ($x): string => 'ok',
-			$this->emptyRepo,
-		);
+		$this->compiler->compile(ArgTypelessParamHandler::class, $this->emptyRepo);
 	}
 
 	public function testBuiltinTypeParameterThrowsAtCompileTime(): void
 	{
 		$this->expectException(\RuntimeException::class);
 
-		$this->compiler->compile(
-			static fn (string $name): string => 'ok',
-			$this->emptyRepo,
-		);
+		$this->compiler->compile(ArgBuiltinParamHandler::class, $this->emptyRepo);
 	}
 
 	public function testCustomSourceCanResolveBuiltinType(): void
@@ -150,7 +187,7 @@ final class ArgumentPlanCompilerTest extends TestCase
 		};
 
 		$compiler = new ArgumentPlanCompiler([$source]);
-		$plan     = $compiler->compile(static fn (string $name): string => $name, $this->emptyRepo);
+		$plan     = $compiler->compile(ArgBuiltinParamHandler::class, $this->emptyRepo);
 
 		$this->assertCount(1, $plan->instructions);
 		$this->assertSame($instruction, $plan->instructions[0]);
@@ -166,10 +203,7 @@ final class ArgumentPlanCompilerTest extends TestCase
 		};
 
 		$compiler = new ArgumentPlanCompiler([$source]);
-		$plan     = $compiler->compile(
-			static fn (OperationContextInterface $ctx): string => 'ok',
-			$this->emptyRepo,
-		);
+		$plan     = $compiler->compile(ArgContextParamHandler::class, $this->emptyRepo);
 
 		$this->assertCount(1, $plan->instructions);
 		$this->assertInstanceOf(ContextArgumentInstruction::class, $plan->instructions[0]);
@@ -208,20 +242,14 @@ final class ArgumentPlanCompilerTest extends TestCase
 		};
 
 		$compiler = new ArgumentPlanCompiler([$sourceA, $sourceB]);
-		$plan     = $compiler->compile(
-			static fn (OperationContextInterface $ctx): string => 'ok',
-			$this->emptyRepo,
-		);
+		$plan     = $compiler->compile(ArgContextParamHandler::class, $this->emptyRepo);
 
 		$this->assertSame($instrA, $plan->instructions[0]);
 	}
 
 	public function testFactoryInstructionResolvesCorrectDependency(): void
 	{
-		$plan = $this->compiler->compile(
-			static fn (PlanCompilerDep $dep): string => 'ok',
-			$this->repoWithDep,
-		);
+		$plan = $this->compiler->compile(ArgDepParamHandler::class, $this->repoWithDep);
 
 		$instr = $plan->instructions[0];
 		$this->assertInstanceOf(FactoryArgumentInstruction::class, $instr);

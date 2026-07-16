@@ -9,13 +9,13 @@ use Rokke\Contracts\Build\DefinitionInterface;
 final readonly class OperationDefinition implements DefinitionInterface
 {
 	/**
-	 * @param callable                $handler
+	 * @param class-string            $handler
 	 * @param list<BehaviorDescriptor> $behaviors
 	 */
 	public function __construct(
 		public string $id,
 		public string $name,
-		public mixed $handler,
+		public string $handler,
 		public array $behaviors = [],
 	) {}
 }

@@ -18,6 +18,14 @@ use Rokke\Runtime\Compiled\Results\ScalarResultInstruction;
 use Rokke\Runtime\Contracts\ExecutionBehaviorInterface;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 
+final class PipelineHelloHandler
+{
+	public function __invoke(): string
+	{
+		return 'hello';
+	}
+}
+
 final class CompiledExecutionPipelineTest extends TestCase
 {
 	private function makeCtx(): OperationContextInterface
@@ -220,8 +228,9 @@ final class CompiledExecutionPipelineTest extends TestCase
 		$model->add(new OperationDefinition(
 			id: 'greet',
 			name: 'Greet',
-			handler: static fn (): string => 'hello',
+			handler: PipelineHelloHandler::class,
 		));
+
 
 		$runtime = (new DefaultRuntimeBuilder())->build($model);
 

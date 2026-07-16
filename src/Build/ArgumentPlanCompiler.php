@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Build;
 
-use ReflectionFunction;
+use ReflectionMethod;
 use ReflectionNamedType;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
 
@@ -23,9 +23,10 @@ final class ArgumentPlanCompiler
 		];
 	}
 
-	public function compile(callable $handler, FactoryRepository $factories): ArgumentResolutionPlan
+	/** @param class-string $handlerClass */
+	public function compile(string $handlerClass, FactoryRepository $factories): ArgumentResolutionPlan
 	{
-		$reflection   = new ReflectionFunction(\Closure::fromCallable($handler));
+		$reflection   = new ReflectionMethod($handlerClass, '__invoke');
 		$instructions = [];
 
 		foreach ($reflection->getParameters() as $param) {

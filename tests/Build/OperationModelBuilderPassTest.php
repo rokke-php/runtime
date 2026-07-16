@@ -11,6 +11,23 @@ use Rokke\Runtime\Build\OperationCapability;
 use Rokke\Runtime\Build\OperationDefinition;
 use Rokke\Runtime\Build\OperationModelBuilderPass;
 
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+
+final class PassTestStringHandler
+{
+	public function __invoke(): string
+	{
+		return 'result';
+	}
+}
+
+final class PassTestVoidHandler
+{
+	public function __invoke(): void {}
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 final class OperationModelBuilderPassTest extends TestCase
 {
 	private OperationModelBuilderPass $pass;
@@ -34,8 +51,7 @@ final class OperationModelBuilderPassTest extends TestCase
 
 	public function testAddsOneDefinitionPerOperationCapability(): void
 	{
-		$handler = static fn (): string => 'result';
-		$cap     = new OperationCapability('users.show', 'Show User', $handler);
+		$cap = new OperationCapability('users.show', 'Show User', PassTestStringHandler::class);
 
 		$this->pass->process([$cap], $this->model);
 
@@ -45,7 +61,7 @@ final class OperationModelBuilderPassTest extends TestCase
 
 	public function testDefinitionPreservesId(): void
 	{
-		$cap = new OperationCapability('orders.create', 'Create Order', static fn (): null => null);
+		$cap = new OperationCapability('orders.create', 'Create Order', PassTestVoidHandler::class);
 
 		$this->pass->process([$cap], $this->model);
 
@@ -54,7 +70,7 @@ final class OperationModelBuilderPassTest extends TestCase
 
 	public function testDefinitionPreservesName(): void
 	{
-		$cap = new OperationCapability('orders.create', 'Create Order', static fn (): null => null);
+		$cap = new OperationCapability('orders.create', 'Create Order', PassTestVoidHandler::class);
 
 		$this->pass->process([$cap], $this->model);
 
@@ -63,21 +79,19 @@ final class OperationModelBuilderPassTest extends TestCase
 
 	public function testDefinitionPreservesHandler(): void
 	{
-		$handler = static fn (): string => 'executed';
-		$cap     = new OperationCapability('op', 'Op', $handler);
+		$cap = new OperationCapability('op', 'Op', PassTestStringHandler::class);
 
 		$this->pass->process([$cap], $this->model);
 
-		$def    = $this->model->definitions(OperationDefinition::class)[0];
-		$result = ($def->handler)();
-		$this->assertSame('executed', $result);
+		$def = $this->model->definitions(OperationDefinition::class)[0];
+		$this->assertSame(PassTestStringHandler::class, $def->handler);
 	}
 
 	public function testProcessesMixedCapabilitiesSkippingNonOperation(): void
 	{
 		/** @var CapabilityInterface $other */
 		$other = $this->createStub(CapabilityInterface::class);
-		$op    = new OperationCapability('x', 'X', static fn (): null => null);
+		$op    = new OperationCapability('x', 'X', PassTestVoidHandler::class);
 
 		$this->pass->process([$other, $op, $other], $this->model);
 
@@ -86,8 +100,8 @@ final class OperationModelBuilderPassTest extends TestCase
 
 	public function testMultipleOperationsAreAllAdded(): void
 	{
-		$a = new OperationCapability('op.a', 'A', static fn (): null => null);
-		$b = new OperationCapability('op.b', 'B', static fn (): null => null);
+		$a = new OperationCapability('op.a', 'A', PassTestVoidHandler::class);
+		$b = new OperationCapability('op.b', 'B', PassTestVoidHandler::class);
 
 		$this->pass->process([$a, $b], $this->model);
 
