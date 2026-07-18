@@ -191,4 +191,20 @@ final class FactoryRepositoryTest extends TestCase
 
 		FactoryRepository::build([$this->selfDescriptor(RepoOneDep::class)], $this->compiler);
 	}
+
+	public function testFromDescriptorsPreservesInterfaceAliases(): void
+	{
+		$descriptor = new ServiceDescriptor(
+			RepoContract::class,
+			RepoImpl::class,
+			[RepoContract::class, RepoImpl::class],
+		);
+
+		$original = FactoryRepository::build([$descriptor], $this->compiler);
+		$loaded   = FactoryRepository::fromDescriptors($original->descriptors());
+
+		$this->assertNotNull($loaded->id(RepoContract::class), 'Interface alias must survive round-trip');
+		$this->assertNotNull($loaded->id(RepoImpl::class), 'Implementation alias must survive round-trip');
+		$this->assertSame($loaded->id(RepoContract::class), $loaded->id(RepoImpl::class));
+	}
 }

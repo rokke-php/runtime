@@ -9,13 +9,10 @@ use Rokke\Runtime\Contracts\OperationContextInterface;
 
 final readonly class FactoryArgumentInstruction implements ArgumentInstructionInterface
 {
-    public function __construct(
-        public int $factoryId,
-        private FactoryRepository $factories,
-    ) {}
+	public function __construct(public int $factoryId) {}
 
-    public function resolve(OperationContextInterface $context): object
-    {
-        return $this->factories->create($this->factoryId);
-    }
+	public function resolve(OperationContextInterface $context, FactoryRepository $factories): object
+	{
+		return $factories->create($this->factoryId);
+	}
 }

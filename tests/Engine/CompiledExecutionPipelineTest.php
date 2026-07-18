@@ -25,246 +25,259 @@ use Rokke\Runtime\Contracts\OperationContextInterface;
 
 final class PipelineHelloHandler
 {
-    public function __invoke(): string { return 'hello'; }
+	public function __invoke(): string
+	{
+		return 'hello';
+	}
 }
 
 final class PipelineWrongHandler
 {
-    public function __invoke(): string { return 'wrong'; }
+	public function __invoke(): string
+	{
+		return 'wrong';
+	}
 }
 
 final class PipelineRightHandler
 {
-    public function __invoke(): string { return 'right'; }
+	public function __invoke(): string
+	{
+		return 'right';
+	}
 }
 
 final class PipelineContextCaptureHandler
 {
-    public static ?OperationContextInterface $received = null;
+	public static ?OperationContextInterface $received = null;
 
-    public function __invoke(OperationContextInterface $c): void
-    {
-        self::$received = $c;
-    }
+	public function __invoke(OperationContextInterface $c): void
+	{
+		self::$received = $c;
+	}
 }
 
 final class PipelineBehaviorHandler
 {
-    public function __invoke(): string
-    {
-        return 'result';
-    }
+	public function __invoke(): string
+	{
+		return 'result';
+	}
 }
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 
 final class CompiledExecutionPipelineTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        PipelineContextCaptureHandler::$received = null;
-    }
+	protected function setUp(): void
+	{
+		PipelineContextCaptureHandler::$received = null;
+	}
 
-    private function makeCtx(): OperationContextInterface
-    {
-        return $this->createStub(OperationContextInterface::class);
-    }
+	private function makeCtx(): OperationContextInterface
+	{
+		return $this->createStub(OperationContextInterface::class);
+	}
 
-    private function scalarResultPlan(): ResultResolutionPlan
-    {
-        return new ResultResolutionPlan(new ScalarResultInstruction('string'));
-    }
+	private function scalarResultPlan(): ResultResolutionPlan
+	{
+		return new ResultResolutionPlan(new ScalarResultInstruction('string'));
+	}
 
-    private function singleHandlerRepo(string $class): FactoryRepository
-    {
-        return FactoryRepository::fromDescriptors([new CompiledFactory($class)]);
-    }
+	/** @param class-string $class */
+	private function singleHandlerRepo(string $class): FactoryRepository
+	{
+		return FactoryRepository::fromDescriptors([new CompiledFactory($class)]);
+	}
 
-    private function makePipeline(
-        string $handlerClass,
-        ArgumentResolutionPlan $argPlan,
-        ResultResolutionPlan $resultPlan,
-        ?CompiledBehaviorPipeline $behaviors = null,
-    ): CompiledExecutionPipeline {
-        return new CompiledExecutionPipeline(
-            factories: $this->singleHandlerRepo($handlerClass),
-            argumentPlans: [0 => $argPlan],
-            resultPlans: [0 => $resultPlan],
-            behaviorPipelines: $behaviors !== null ? [0 => $behaviors] : [],
-            validationPlans: [],
-        );
-    }
+	/**
+	 * @param class-string $handlerClass
+	 */
+	private function makePipeline(
+		string $handlerClass,
+		ArgumentResolutionPlan $argPlan,
+		ResultResolutionPlan $resultPlan,
+		?CompiledBehaviorPipeline $behaviors = null,
+	): CompiledExecutionPipeline {
+		return new CompiledExecutionPipeline(
+			factories: $this->singleHandlerRepo($handlerClass),
+			argumentPlans: [0 => $argPlan],
+			resultPlans: [0 => $resultPlan],
+			behaviorPipelines: $behaviors !== null ? [0 => $behaviors] : [],
+			validationPlans: [],
+		);
+	}
 
-    private function makeOp(
-        int $factoryId = 0,
-        int $argPlanId = 0,
-        int $resultPlanId = 0,
-        ?int $behaviorPipelineId = null,
-    ): CompiledOperation {
-        return new CompiledOperation(
-            id: 'op',
-            pipelineId: 0,
-            factoryId: $factoryId,
-            argumentPlanId: $argPlanId,
-            resultPlanId: $resultPlanId,
-            behaviorPipelineId: $behaviorPipelineId,
-        );
-    }
+	private function makeOp(
+		int $factoryId = 0,
+		int $argPlanId = 0,
+		int $resultPlanId = 0,
+		?int $behaviorPipelineId = null,
+	): CompiledOperation {
+		return new CompiledOperation(
+			id: 'op',
+			pipelineId: 0,
+			factoryId: $factoryId,
+			argumentPlanId: $argPlanId,
+			resultPlanId: $resultPlanId,
+			behaviorPipelineId: $behaviorPipelineId,
+		);
+	}
 
-    // ── Invocation ────────────────────────────────────────────────────────────
+	// ── Invocation ────────────────────────────────────────────────────────────
 
-    public function testHandlerIsCalledAndResultReturned(): void
-    {
-        $pipeline = $this->makePipeline(
-            handlerClass: PipelineHelloHandler::class,
-            argPlan: new ArgumentResolutionPlan([]),
-            resultPlan: $this->scalarResultPlan(),
-        );
+	public function testHandlerIsCalledAndResultReturned(): void
+	{
+		$pipeline = $this->makePipeline(
+			handlerClass: PipelineHelloHandler::class,
+			argPlan: new ArgumentResolutionPlan([]),
+			resultPlan: $this->scalarResultPlan(),
+		);
 
-        $this->assertSame('hello', $pipeline->execute($this->makeOp(), $this->makeCtx()));
-    }
+		$this->assertSame('hello', $pipeline->execute($this->makeOp(), $this->makeCtx()));
+	}
 
-    public function testHandlerReceivesResolvedArguments(): void
-    {
-        $ctx      = $this->createStub(OperationContextInterface::class);
-        $pipeline = $this->makePipeline(
-            handlerClass: PipelineContextCaptureHandler::class,
-            argPlan: new ArgumentResolutionPlan([new ContextArgumentInstruction()]),
-            resultPlan: new ResultResolutionPlan(new VoidResultInstruction()),
-        );
+	public function testHandlerReceivesResolvedArguments(): void
+	{
+		$ctx      = $this->createStub(OperationContextInterface::class);
+		$pipeline = $this->makePipeline(
+			handlerClass: PipelineContextCaptureHandler::class,
+			argPlan: new ArgumentResolutionPlan([new ContextArgumentInstruction()]),
+			resultPlan: new ResultResolutionPlan(new VoidResultInstruction()),
+		);
 
-        $pipeline->execute($this->makeOp(), $ctx);
+		$pipeline->execute($this->makeOp(), $ctx);
 
-        $this->assertSame($ctx, PipelineContextCaptureHandler::$received);
-    }
+		$this->assertSame($ctx, PipelineContextCaptureHandler::$received);
+	}
 
-    // ── Multiple handlers / IDs ───────────────────────────────────────────────
+	// ── Multiple handlers / IDs ───────────────────────────────────────────────
 
-    public function testCorrectHandlerSelectedByFactoryId(): void
-    {
-        $repo = FactoryRepository::fromDescriptors([
-            new CompiledFactory(PipelineWrongHandler::class),  // id=0
-            new CompiledFactory(PipelineRightHandler::class),  // id=1
-        ]);
+	public function testCorrectHandlerSelectedByFactoryId(): void
+	{
+		$repo = FactoryRepository::fromDescriptors([
+			new CompiledFactory(PipelineWrongHandler::class),  // id=0
+			new CompiledFactory(PipelineRightHandler::class),  // id=1
+		]);
 
-        $pipeline = new CompiledExecutionPipeline(
-            factories: $repo,
-            argumentPlans: [0 => new ArgumentResolutionPlan([]), 1 => new ArgumentResolutionPlan([])],
-            resultPlans: [0 => $this->scalarResultPlan(), 1 => $this->scalarResultPlan()],
-            behaviorPipelines: [],
-            validationPlans: [],
-        );
+		$pipeline = new CompiledExecutionPipeline(
+			factories: $repo,
+			argumentPlans: [0 => new ArgumentResolutionPlan([]), 1 => new ArgumentResolutionPlan([])],
+			resultPlans: [0 => $this->scalarResultPlan(), 1 => $this->scalarResultPlan()],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
 
-        $op     = new CompiledOperation('op', 0, 1, 1, 1);
-        $result = $pipeline->execute($op, $this->makeCtx());
+		$op     = new CompiledOperation('op', 0, 1, 1, 1);
+		$result = $pipeline->execute($op, $this->makeCtx());
 
-        $this->assertSame('right', $result);
-    }
+		$this->assertSame('right', $result);
+	}
 
-    // ── BehaviorPipeline integration ──────────────────────────────────────────
+	// ── BehaviorPipeline integration ──────────────────────────────────────────
 
-    public function testBehaviorPipelineExecutesAroundHandler(): void
-    {
-        $log      = [];
-        $behavior = new class ($log) implements ExecutionBehaviorInterface {
-            /** @param list<string> $log */
-            public function __construct(private array &$log) {}
+	public function testBehaviorPipelineExecutesAroundHandler(): void
+	{
+		$log      = [];
+		$behavior = new class ($log) implements ExecutionBehaviorInterface {
+			/** @param list<string> $log */
+			public function __construct(private array &$log) {}
 
-            public function handle(OperationContextInterface $context, callable $next): mixed
-            {
-                $this->log[] = 'behavior';
-                return $next();
-            }
-        };
+			public function handle(OperationContextInterface $context, callable $next): mixed
+			{
+				$this->log[] = 'behavior';
+				return $next();
+			}
+		};
 
-        $pipeline = new CompiledExecutionPipeline(
-            factories: $this->singleHandlerRepo(PipelineHelloHandler::class),
-            argumentPlans: [0 => new ArgumentResolutionPlan([])],
-            resultPlans: [0 => $this->scalarResultPlan()],
-            behaviorPipelines: [0 => new CompiledBehaviorPipeline([$behavior])],
-            validationPlans: [],
-        );
+		$pipeline = new CompiledExecutionPipeline(
+			factories: $this->singleHandlerRepo(PipelineHelloHandler::class),
+			argumentPlans: [0 => new ArgumentResolutionPlan([])],
+			resultPlans: [0 => $this->scalarResultPlan()],
+			behaviorPipelines: [0 => new CompiledBehaviorPipeline([$behavior])],
+			validationPlans: [],
+		);
 
-        $op     = new CompiledOperation('op', 0, 0, 0, 0, behaviorPipelineId: 0);
-        $result = $pipeline->execute($op, $this->makeCtx());
+		$op     = new CompiledOperation('op', 0, 0, 0, 0, behaviorPipelineId: 0);
+		$result = $pipeline->execute($op, $this->makeCtx());
 
-        $this->assertSame(['behavior'], $log);
-        $this->assertSame('hello', $result);
-    }
+		$this->assertSame(['behavior'], $log);
+		$this->assertSame('hello', $result);
+	}
 
-    public function testNullBehaviorPipelineIdSkipsBehaviors(): void
-    {
-        $pipeline = $this->makePipeline(
-            handlerClass: PipelineHelloHandler::class,
-            argPlan: new ArgumentResolutionPlan([]),
-            resultPlan: $this->scalarResultPlan(),
-        );
+	public function testNullBehaviorPipelineIdSkipsBehaviors(): void
+	{
+		$pipeline = $this->makePipeline(
+			handlerClass: PipelineHelloHandler::class,
+			argPlan: new ArgumentResolutionPlan([]),
+			resultPlan: $this->scalarResultPlan(),
+		);
 
-        $this->assertSame('hello', $pipeline->execute($this->makeOp(behaviorPipelineId: null), $this->makeCtx()));
-    }
+		$this->assertSame('hello', $pipeline->execute($this->makeOp(behaviorPipelineId: null), $this->makeCtx()));
+	}
 
-    // ── Error propagation ─────────────────────────────────────────────────────
+	// ── Error propagation ─────────────────────────────────────────────────────
 
-    public function testThrowsWhenFactoryIdMissing(): void
-    {
-        $pipeline = new CompiledExecutionPipeline(
-            factories: FactoryRepository::fromDescriptors([]),
-            argumentPlans: [0 => new ArgumentResolutionPlan([])],
-            resultPlans: [0 => $this->scalarResultPlan()],
-            behaviorPipelines: [],
-            validationPlans: [],
-        );
+	public function testThrowsWhenFactoryIdMissing(): void
+	{
+		$pipeline = new CompiledExecutionPipeline(
+			factories: FactoryRepository::fromDescriptors([]),
+			argumentPlans: [0 => new ArgumentResolutionPlan([])],
+			resultPlans: [0 => $this->scalarResultPlan()],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('No factory registered for ID 0');
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('No factory registered for ID 0');
 
-        $pipeline->execute($this->makeOp(), $this->makeCtx());
-    }
+		$pipeline->execute($this->makeOp(), $this->makeCtx());
+	}
 
-    public function testThrowsWhenArgumentPlanMissing(): void
-    {
-        $pipeline = new CompiledExecutionPipeline(
-            factories: $this->singleHandlerRepo(PipelineHelloHandler::class),
-            argumentPlans: [],
-            resultPlans: [0 => $this->scalarResultPlan()],
-            behaviorPipelines: [],
-            validationPlans: [],
-        );
+	public function testThrowsWhenArgumentPlanMissing(): void
+	{
+		$pipeline = new CompiledExecutionPipeline(
+			factories: $this->singleHandlerRepo(PipelineHelloHandler::class),
+			argumentPlans: [],
+			resultPlans: [0 => $this->scalarResultPlan()],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('ArgumentResolutionPlan #0 not found');
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('ArgumentResolutionPlan #0 not found');
 
-        $pipeline->execute($this->makeOp(), $this->makeCtx());
-    }
+		$pipeline->execute($this->makeOp(), $this->makeCtx());
+	}
 
-    public function testThrowsWhenResultPlanMissing(): void
-    {
-        $pipeline = new CompiledExecutionPipeline(
-            factories: $this->singleHandlerRepo(PipelineHelloHandler::class),
-            argumentPlans: [0 => new ArgumentResolutionPlan([])],
-            resultPlans: [],
-            behaviorPipelines: [],
-            validationPlans: [],
-        );
+	public function testThrowsWhenResultPlanMissing(): void
+	{
+		$pipeline = new CompiledExecutionPipeline(
+			factories: $this->singleHandlerRepo(PipelineHelloHandler::class),
+			argumentPlans: [0 => new ArgumentResolutionPlan([])],
+			resultPlans: [],
+			behaviorPipelines: [],
+			validationPlans: [],
+		);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('ResultResolutionPlan #0 not found');
+		$this->expectException(\RuntimeException::class);
+		$this->expectExceptionMessage('ResultResolutionPlan #0 not found');
 
-        $pipeline->execute($this->makeOp(), $this->makeCtx());
-    }
+		$pipeline->execute($this->makeOp(), $this->makeCtx());
+	}
 
-    // ── End-to-end via DefaultRuntimeBuilder ─────────────────────────────────
+	// ── End-to-end via DefaultRuntimeBuilder ─────────────────────────────────
 
-    public function testBuilderProducesWorkingPipelineEndToEnd(): void
-    {
-        $model = new ApplicationModel();
-        $model->add(new OperationDefinition(id: 'greet', name: 'Greet', handler: PipelineHelloHandler::class));
+	public function testBuilderProducesWorkingPipelineEndToEnd(): void
+	{
+		$model = new ApplicationModel();
+		$model->add(new OperationDefinition(id: 'greet', name: 'Greet', handler: PipelineHelloHandler::class));
 
-        $runtime = (new DefaultRuntimeBuilder())->build($model);
+		$runtime = (new DefaultRuntimeBuilder())->build($model);
 
-        $op = $this->createStub(\Rokke\Runtime\Contracts\OperationInterface::class);
-        $op->method('id')->willReturn('greet');
+		$op = $this->createStub(\Rokke\Runtime\Contracts\OperationInterface::class);
+		$op->method('id')->willReturn('greet');
 
-        $this->assertSame('hello', $runtime->execute($op, $this->makeCtx()));
-    }
+		$this->assertSame('hello', $runtime->execute($op, $this->makeCtx()));
+	}
 }

@@ -167,7 +167,7 @@ final class ArgumentPlanCompilerTest extends TestCase
 	public function testCustomSourceCanResolveBuiltinType(): void
 	{
 		$instruction = new class () implements ArgumentInstructionInterface {
-			public function resolve(OperationContextInterface $context): mixed
+			public function resolve(OperationContextInterface $context, \Rokke\Runtime\Build\FactoryRepository $factories): mixed
 			{
 				return 'custom';
 			}
@@ -212,13 +212,13 @@ final class ArgumentPlanCompilerTest extends TestCase
 	public function testFirstMatchingSourceWins(): void
 	{
 		$instrA = new class () implements ArgumentInstructionInterface {
-			public function resolve(OperationContextInterface $context): mixed
+			public function resolve(OperationContextInterface $context, \Rokke\Runtime\Build\FactoryRepository $factories): mixed
 			{
 				return 'a';
 			}
 		};
 		$instrB = new class () implements ArgumentInstructionInterface {
-			public function resolve(OperationContextInterface $context): mixed
+			public function resolve(OperationContextInterface $context, \Rokke\Runtime\Build\FactoryRepository $factories): mixed
 			{
 				return 'b';
 			}
@@ -256,7 +256,7 @@ final class ArgumentPlanCompilerTest extends TestCase
 		assert($instr instanceof FactoryArgumentInstruction);
 
 		$ctx      = $this->createStub(OperationContextInterface::class);
-		$resolved = $instr->resolve($ctx);
+		$resolved = $instr->resolve($ctx, $this->repoWithDep);
 		$this->assertInstanceOf(PlanCompilerDep::class, $resolved);
 	}
 }

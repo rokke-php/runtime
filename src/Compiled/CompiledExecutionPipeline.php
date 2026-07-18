@@ -59,7 +59,7 @@ final readonly class CompiledExecutionPipeline
 		$argPlan = $this->argumentPlans[$op->argumentPlanId]
 			?? throw new \RuntimeException("ArgumentResolutionPlan #{$op->argumentPlanId} not found in CompiledExecutionPipeline.");
 
-		$args = $argPlan->resolveAll($context);
+		$args = $argPlan->resolveAll($context, $this->factories);
 
 		// ── Stage 2: Validation (part of argument stage) ──────────────────────
 		$validationPlan = $this->validationPlans[$op->validationPlanId] ?? null;

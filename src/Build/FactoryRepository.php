@@ -35,6 +35,10 @@ final class FactoryRepository
 		foreach ($descriptors as $id => $factory) {
 			$repo->byId[$id]                           = $factory;
 			$repo->aliasToId[$factory->implementation] = $id;
+
+			foreach ($factory->aliases as $alias) {
+				$repo->aliasToId[$alias] = $id;
+			}
 		}
 
 		return $repo;
@@ -84,7 +88,11 @@ final class FactoryRepository
 		$factory    = $this->compiler->compile($descriptor, $this->resolve(...));
 		$id         = $this->nextId++;
 
-		$this->byId[$id] = $factory;
+		$this->byId[$id] = new CompiledFactory(
+			$factory->implementation,
+			$factory->dependencies,
+			$descriptor->aliases,
+		);
 
 		foreach ($descriptor->aliases as $resolvedAlias) {
 			$this->aliasToId[$resolvedAlias] = $id;

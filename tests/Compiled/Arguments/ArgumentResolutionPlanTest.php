@@ -19,7 +19,7 @@ final class ArgumentResolutionPlanTest extends TestCase
 		$plan = new ArgumentResolutionPlan([]);
 		$ctx  = $this->createStub(OperationContextInterface::class);
 
-		$this->assertSame([], $plan->resolveAll($ctx));
+		$this->assertSame([], $plan->resolveAll($ctx, FactoryRepository::fromDescriptors([])));
 	}
 
 	public function testSingleContextInstructionResolvesToContext(): void
@@ -27,15 +27,15 @@ final class ArgumentResolutionPlanTest extends TestCase
 		$ctx  = $this->createStub(OperationContextInterface::class);
 		$plan = new ArgumentResolutionPlan([new ContextArgumentInstruction()]);
 
-		$this->assertSame([$ctx], $plan->resolveAll($ctx));
+		$this->assertSame([$ctx], $plan->resolveAll($ctx, FactoryRepository::fromDescriptors([])));
 	}
 
 	public function testSingleFactoryInstructionResolvesToCreatedInstance(): void
 	{
 		$factories = FactoryRepository::fromDescriptors([new CompiledFactory(\stdClass::class)]);
-		$plan      = new ArgumentResolutionPlan([new FactoryArgumentInstruction(0, $factories)]);
+		$plan      = new ArgumentResolutionPlan([new FactoryArgumentInstruction(0)]);
 		$ctx       = $this->createStub(OperationContextInterface::class);
-		$result    = $plan->resolveAll($ctx);
+		$result    = $plan->resolveAll($ctx, $factories);
 
 		$this->assertCount(1, $result);
 		$this->assertInstanceOf(\stdClass::class, $result[0]);
@@ -47,11 +47,11 @@ final class ArgumentResolutionPlanTest extends TestCase
 		$ctx       = $this->createStub(OperationContextInterface::class);
 
 		$plan = new ArgumentResolutionPlan([
-			new FactoryArgumentInstruction(0, $factories),
+			new FactoryArgumentInstruction(0),
 			new ContextArgumentInstruction(),
 		]);
 
-		[$resolvedDep, $resolvedCtx] = $plan->resolveAll($ctx);
+		[$resolvedDep, $resolvedCtx] = $plan->resolveAll($ctx, $factories);
 
 		$this->assertInstanceOf(\stdClass::class, $resolvedDep);
 		$this->assertSame($ctx, $resolvedCtx);

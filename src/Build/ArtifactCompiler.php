@@ -79,10 +79,18 @@ final class ArtifactCompiler
 				array_map(static fn (int $id): NodeInterface => new LiteralNode($id), $factory->dependencies),
 			);
 
-			$descriptorNodes[] = new NewObjectNode(CompiledFactory::class, [
+			$args = [
 				'implementation' => new ClassReferenceNode($factory->implementation),
 				'dependencies'   => $depsNode,
-			]);
+			];
+
+			if ($factory->aliases !== []) {
+				$args['aliases'] = new ArrayNode(
+					array_map(static fn (string $a): NodeInterface => new LiteralNode($a), $factory->aliases),
+				);
+			}
+
+			$descriptorNodes[] = new NewObjectNode(CompiledFactory::class, $args);
 		}
 
 		return new StaticCallNode(FactoryRepository::class, 'fromDescriptors', [
@@ -100,7 +108,6 @@ final class ArtifactCompiler
 				$instr instanceof ContextArgumentInstruction => new NewObjectNode(ContextArgumentInstruction::class),
 				$instr instanceof FactoryArgumentInstruction => new NewObjectNode(FactoryArgumentInstruction::class, [
 					'factoryId' => new LiteralNode($instr->factoryId),
-					'factories' => $repoNode,
 				]),
 				default => throw new \RuntimeException('Unsupported argument instruction: ' . $instr::class),
 			};
