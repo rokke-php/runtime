@@ -10,15 +10,11 @@ use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\ServiceDescriptor;
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
-
 final class RepoNoDeps {}
-
 final class RepoOneDep
 {
 	public function __construct(public readonly RepoNoDeps $dep) {}
 }
-
 final class RepoTwoDeps
 {
 	public function __construct(
@@ -26,11 +22,8 @@ final class RepoTwoDeps
 		public readonly RepoOneDep $second,
 	) {}
 }
-
 interface RepoContract {}
 final class RepoImpl implements RepoContract {}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 final class FactoryRepositoryTest extends TestCase
 {
@@ -47,18 +40,20 @@ final class FactoryRepositoryTest extends TestCase
 		return new ServiceDescriptor($class, $class, [$class]);
 	}
 
+	// ── id / has / get ───────────────────────────────────────────────────────
+
 	public function testBuildWithNoDescriptorsProducesEmptyRepository(): void
 	{
 		$repo = FactoryRepository::build([], $this->compiler);
 
-		$this->assertNull($repo->get(RepoNoDeps::class));
+		$this->assertNull($repo->id(RepoNoDeps::class));
 	}
 
-	public function testGetReturnsNullForUnregisteredAlias(): void
+	public function testIdReturnsNullForUnregisteredAlias(): void
 	{
 		$repo = FactoryRepository::build([$this->selfDescriptor(RepoNoDeps::class)], $this->compiler);
 
-		$this->assertNull($repo->get(RepoOneDep::class));
+		$this->assertNull($repo->id(RepoOneDep::class));
 	}
 
 	public function testHasReturnsFalseForUnregisteredAlias(): void
@@ -75,22 +70,68 @@ final class FactoryRepositoryTest extends TestCase
 		$this->assertTrue($repo->has(RepoNoDeps::class));
 	}
 
-	public function testGetReturnsCompiledFactoryForRegisteredClass(): void
+	public function testIdReturnsIntForRegisteredClass(): void
 	{
 		$repo = FactoryRepository::build([$this->selfDescriptor(RepoNoDeps::class)], $this->compiler);
 
-		$this->assertInstanceOf(CompiledFactory::class, $repo->get(RepoNoDeps::class));
+		$this->assertIsInt($repo->id(RepoNoDeps::class));
 	}
 
-	public function testFactoryCreatesCorrectType(): void
+	public function testGetReturnsCompiledFactoryDescriptor(): void
 	{
-		$repo    = FactoryRepository::build([$this->selfDescriptor(RepoNoDeps::class)], $this->compiler);
-		$factory = $repo->get(RepoNoDeps::class);
+		$repo = FactoryRepository::build([$this->selfDescriptor(RepoNoDeps::class)], $this->compiler);
 
-		$this->assertInstanceOf(RepoNoDeps::class, $factory?->create());
+		$factory = $repo->get(RepoNoDeps::class);
+		$this->assertInstanceOf(CompiledFactory::class, $factory);
+		$this->assertSame(RepoNoDeps::class, $factory->implementation);
 	}
 
-	public function testBothAliasesReturnSameFactoryInstance(): void
+	// ── create ───────────────────────────────────────────────────────────────
+
+	public function testCreateInstantiatesCorrectType(): void
+	{
+		$repo = FactoryRepository::build([$this->selfDescriptor(RepoNoDeps::class)], $this->compiler);
+		$id   = $repo->id(RepoNoDeps::class);
+
+		$this->assertNotNull($id);
+		$this->assertInstanceOf(RepoNoDeps::class, $repo->create($id));
+	}
+
+	public function testCreateProducesNewInstanceEachCall(): void
+	{
+		$repo = FactoryRepository::build([$this->selfDescriptor(RepoNoDeps::class)], $this->compiler);
+		$id   = $repo->id(RepoNoDeps::class);
+		$this->assertNotNull($id);
+
+		$this->assertNotSame($repo->create($id), $repo->create($id));
+	}
+
+	public function testCreateResolvesDependenciesTransitively(): void
+	{
+		$repo = FactoryRepository::build([
+			$this->selfDescriptor(RepoNoDeps::class),
+			$this->selfDescriptor(RepoOneDep::class),
+		], $this->compiler);
+
+		$id = $repo->id(RepoOneDep::class);
+		$this->assertNotNull($id);
+
+		$instance = $repo->create($id);
+		$this->assertInstanceOf(RepoOneDep::class, $instance);
+		$this->assertInstanceOf(RepoNoDeps::class, $instance->dep);
+	}
+
+	public function testCreateThrowsForUnknownId(): void
+	{
+		$repo = FactoryRepository::build([], $this->compiler);
+
+		$this->expectException(\RuntimeException::class);
+		$repo->create(99);
+	}
+
+	// ── both aliases share same ID ───────────────────────────────────────────
+
+	public function testBothAliasesReturnSameId(): void
 	{
 		$descriptor = new ServiceDescriptor(
 			RepoContract::class,
@@ -100,48 +141,48 @@ final class FactoryRepositoryTest extends TestCase
 
 		$repo = FactoryRepository::build([$descriptor], $this->compiler);
 
-		$this->assertSame($repo->get(RepoContract::class), $repo->get(RepoImpl::class));
+		$this->assertSame($repo->id(RepoContract::class), $repo->id(RepoImpl::class));
 	}
 
-	public function testResolvesDependenciesTransitively(): void
+	// ── descriptors / fromDescriptors ────────────────────────────────────────
+
+	public function testDescriptorsReturnsOrderedList(): void
 	{
-		$descriptors = [
+		$repo = FactoryRepository::build([
 			$this->selfDescriptor(RepoNoDeps::class),
 			$this->selfDescriptor(RepoOneDep::class),
-		];
+		], $this->compiler);
 
-		$repo    = FactoryRepository::build($descriptors, $this->compiler);
-		$factory = $repo->get(RepoOneDep::class);
-
-		$this->assertInstanceOf(RepoOneDep::class, $factory?->create());
+		$descs = $repo->descriptors();
+		$this->assertCount(2, $descs);
+		$this->assertContainsOnlyInstancesOf(CompiledFactory::class, $descs);
 	}
 
-	public function testResolvesTransitiveDependencies(): void
+	public function testFromDescriptorsRoundTrip(): void
 	{
-		$descriptors = [
+		$original = FactoryRepository::build([
 			$this->selfDescriptor(RepoNoDeps::class),
 			$this->selfDescriptor(RepoOneDep::class),
-			$this->selfDescriptor(RepoTwoDeps::class),
-		];
+		], $this->compiler);
 
-		$repo    = FactoryRepository::build($descriptors, $this->compiler);
-		$factory = $repo->get(RepoTwoDeps::class);
+		$loaded = FactoryRepository::fromDescriptors($original->descriptors());
 
-		$this->assertInstanceOf(RepoTwoDeps::class, $factory?->create());
+		$id = $loaded->id(RepoOneDep::class);
+		$this->assertNotNull($id);
+		$this->assertInstanceOf(RepoOneDep::class, $loaded->create($id));
 	}
 
 	public function testRegistrationOrderDoesNotMatter(): void
 	{
-		$descriptors = [
+		$repo = FactoryRepository::build([
 			$this->selfDescriptor(RepoTwoDeps::class),
 			$this->selfDescriptor(RepoOneDep::class),
 			$this->selfDescriptor(RepoNoDeps::class),
-		];
+		], $this->compiler);
 
-		$repo    = FactoryRepository::build($descriptors, $this->compiler);
-		$factory = $repo->get(RepoTwoDeps::class);
-
-		$this->assertInstanceOf(RepoTwoDeps::class, $factory?->create());
+		$id = $repo->id(RepoTwoDeps::class);
+		$this->assertNotNull($id);
+		$this->assertInstanceOf(RepoTwoDeps::class, $repo->create($id));
 	}
 
 	public function testBuildThrowsWhenDependencyIsNotRegistered(): void

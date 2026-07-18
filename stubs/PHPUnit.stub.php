@@ -12,7 +12,11 @@ abstract class Assert
 
     public static function assertNotSame(mixed $expected, mixed $actual, string $message = ''): void {}
 
-    /** @param class-string $expected */
+    /**
+     * @template T of object
+     * @param class-string<T> $expected
+     * @phpstan-assert T $actual
+     */
     public static function assertInstanceOf(string $expected, mixed $actual, string $message = ''): void {}
 
     public static function assertTrue(mixed $condition, string $message = ''): void {}
@@ -21,10 +25,16 @@ abstract class Assert
 
     public static function assertNull(mixed $actual, string $message = ''): void {}
 
+    /** @phpstan-assert !null $actual */
+    public static function assertNotNull(mixed $actual, string $message = ''): void {}
+
     public static function assertCount(int $expectedCount, \Countable|iterable $haystack, string $message = ''): void {}
 
     /** @param iterable<mixed> $haystack */
     public static function assertContains(mixed $needle, iterable $haystack, string $message = ''): void {}
+
+    /** @param class-string $className */
+    public static function assertContainsOnlyInstancesOf(string $className, iterable $haystack, string $message = ''): void {}
 }
 
 abstract class TestCase extends Assert

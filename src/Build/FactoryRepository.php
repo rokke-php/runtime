@@ -6,8 +6,13 @@ namespace Rokke\Runtime\Build;
 
 final class FactoryRepository
 {
-	/** @var array<string, CompiledFactory> */
-	private array $factories = [];
+	private int $nextId = 0;
+
+	/** @var array<int, CompiledFactory> */
+	private array $byId = [];
+
+	/** @var array<string, int> */
+	private array $aliasToId = [];
 
 	/** @var array<string, ServiceDescriptor> */
 	private array $aliasMap = [];
@@ -20,6 +25,19 @@ final class FactoryRepository
 	public static function empty(): self
 	{
 		return new self(new FactoryCompiler());
+	}
+
+	/** @param list<CompiledFactory> $descriptors */
+	public static function fromDescriptors(array $descriptors): self
+	{
+		$repo = new self(new FactoryCompiler());
+
+		foreach ($descriptors as $id => $factory) {
+			$repo->byId[$id]                           = $factory;
+			$repo->aliasToId[$factory->implementation] = $id;
+		}
+
+		return $repo;
 	}
 
 	/** @param list<ServiceDescriptor> $descriptors */
@@ -41,16 +59,15 @@ final class FactoryRepository
 	}
 
 	/** @param class-string $alias */
-	private function resolve(string $alias): CompiledFactory
+	private function resolve(string $alias): int
 	{
-		if (isset($this->factories[$alias])) {
-			return $this->factories[$alias];
+		if (isset($this->aliasToId[$alias])) {
+			return $this->aliasToId[$alias];
 		}
 
 		if (isset($this->compiling[$alias])) {
 			throw new \RuntimeException(
-				"Circular dependency detected while compiling '{$alias}'. " .
-				'Check your service registrations for circular constructor dependencies.',
+				"Circular dependency detected while compiling '{$alias}'.",
 			);
 		}
 
@@ -65,22 +82,50 @@ final class FactoryRepository
 
 		$descriptor = $this->aliasMap[$alias];
 		$factory    = $this->compiler->compile($descriptor, $this->resolve(...));
+		$id         = $this->nextId++;
+
+		$this->byId[$id] = $factory;
 
 		foreach ($descriptor->aliases as $resolvedAlias) {
-			$this->factories[$resolvedAlias] = $factory;
+			$this->aliasToId[$resolvedAlias] = $id;
 			unset($this->compiling[$resolvedAlias]);
 		}
 
-		return $factory;
+		return $id;
+	}
+
+	public function create(int $id): object
+	{
+		$factory = $this->byId[$id]
+			?? throw new \RuntimeException("No factory registered for ID {$id}.");
+
+		$args = array_map($this->create(...), $factory->dependencies);
+
+		/** @var object */
+		return new $factory->implementation(...$args);
+	}
+
+	public function id(string $alias): ?int
+	{
+		return $this->aliasToId[$alias] ?? null;
 	}
 
 	public function get(string $alias): ?CompiledFactory
 	{
-		return $this->factories[$alias] ?? null;
+		$id = $this->aliasToId[$alias] ?? null;
+
+		return $id !== null ? $this->byId[$id] : null;
 	}
 
 	public function has(string $alias): bool
 	{
-		return isset($this->factories[$alias]);
+		return isset($this->aliasToId[$alias]);
+	}
+
+	/** @return list<CompiledFactory> ordered by int ID */
+	public function descriptors(): array
+	{
+		ksort($this->byId);
+		return array_values($this->byId);
 	}
 }
