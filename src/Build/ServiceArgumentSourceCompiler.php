@@ -11,18 +11,18 @@ use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
 
 final class ServiceArgumentSourceCompiler implements ArgumentSourceCompilerInterface
 {
-	public function compile(ReflectionParameter $param, FactoryRepository $factories): ?ArgumentInstructionInterface
-	{
-		$type = $param->getType();
+    public function compile(ReflectionParameter $param, FactoryRepository $factories): ?ArgumentInstructionInterface
+    {
+        $type = $param->getType();
 
-		if (!$type instanceof ReflectionNamedType || $type->isBuiltin()) {
-			return null;
-		}
+        if (!$type instanceof ReflectionNamedType || $type->isBuiltin()) {
+            return null;
+        }
 
-		/** @var class-string $typeName */
-		$typeName = $type->getName();
-		$factory  = $factories->get($typeName);
+        /** @var class-string $typeName */
+        $typeName = $type->getName();
+        $id       = $factories->id($typeName);
 
-		return $factory !== null ? new FactoryArgumentInstruction($factory) : null;
-	}
+        return $id !== null ? new FactoryArgumentInstruction($id, $factories) : null;
+    }
 }

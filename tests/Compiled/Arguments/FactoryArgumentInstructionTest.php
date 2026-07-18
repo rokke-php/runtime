@@ -6,51 +6,49 @@ namespace Rokke\Runtime\Tests\Compiled\Arguments;
 
 use PHPUnit\Framework\TestCase;
 use Rokke\Runtime\Build\CompiledFactory;
+use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 
+final class InstrFixtureA {}
+final class InstrFixtureB {}
+
 final class FactoryArgumentInstructionTest extends TestCase
 {
-	public function testResolveDelegatesToCompiledFactory(): void
-	{
-		$instance = new \stdClass();
-		$factory  = new CompiledFactory(static fn (): object => $instance);
-		$instr    = new FactoryArgumentInstruction($factory);
-		$ctx      = $this->createStub(OperationContextInterface::class);
+    private function makeCtx(): OperationContextInterface
+    {
+        return $this->createStub(OperationContextInterface::class);
+    }
 
-		$this->assertSame($instance, $instr->resolve($ctx));
-	}
+    public function testResolveDelegatesToFactoryRepository(): void
+    {
+        $repo  = FactoryRepository::fromDescriptors([new CompiledFactory(InstrFixtureA::class)]);
+        $instr = new FactoryArgumentInstruction(0, $repo);
 
-	public function testResolveIgnoresContext(): void
-	{
-		$a   = new \stdClass();
-		$b   = new \stdClass();
-		$idx = 0;
-		$factory = new CompiledFactory(static function () use ($a, $b, &$idx): object {
-			return $idx++ === 0 ? $a : $b;
-		});
-		$instr = new FactoryArgumentInstruction($factory);
+        $this->assertInstanceOf(InstrFixtureA::class, $instr->resolve($this->makeCtx()));
+    }
 
-		$ctx1 = $this->createStub(OperationContextInterface::class);
-		$ctx2 = $this->createStub(OperationContextInterface::class);
+    public function testResolveIgnoresContext(): void
+    {
+        $repo  = FactoryRepository::fromDescriptors([new CompiledFactory(InstrFixtureA::class)]);
+        $instr = new FactoryArgumentInstruction(0, $repo);
 
-		$this->assertSame($a, $instr->resolve($ctx1));
-		$this->assertSame($b, $instr->resolve($ctx2));
-	}
+        $ctx1 = $this->makeCtx();
+        $ctx2 = $this->makeCtx();
 
-	public function testResolveCallsCreateEachTime(): void
-	{
-		$calls   = 0;
-		$factory = new CompiledFactory(static function () use (&$calls): object {
-			$calls++;
-			return new \stdClass();
-		});
-		$instr = new FactoryArgumentInstruction($factory);
-		$ctx   = $this->createStub(OperationContextInterface::class);
+        $this->assertInstanceOf(InstrFixtureA::class, $instr->resolve($ctx1));
+        $this->assertInstanceOf(InstrFixtureA::class, $instr->resolve($ctx2));
+    }
 
-		$instr->resolve($ctx);
-		$instr->resolve($ctx);
+    public function testResolveCallsCreateEachTime(): void
+    {
+        $repo  = FactoryRepository::fromDescriptors([new CompiledFactory(InstrFixtureA::class)]);
+        $instr = new FactoryArgumentInstruction(0, $repo);
+        $ctx   = $this->makeCtx();
 
-		$this->assertSame(2, $calls);
-	}
+        $a = $instr->resolve($ctx);
+        $b = $instr->resolve($ctx);
+
+        $this->assertNotSame($a, $b);
+    }
 }
