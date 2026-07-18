@@ -50,9 +50,6 @@ parameters:
         # Swoole\Coroutine\run() and WaitGroup are only available with ext-swoole in CI.
         - message: '#Function Swoole\\Coroutine\\run not found#'
           path: tests/*
-        - message: '#Cannot call method getMessage\(\) on .*\|null#'
-          path: tests/*
-
         # Variables assigned inside Swoole\Coroutine\run() closures look nullable to PHPStan;
         # assertions inside the closure guarantee they are set by the time we access them.
         - message: '#Cannot access property \$\w+ on .*\|null#'
@@ -67,11 +64,6 @@ parameters:
         - message: '#Property .* is never read, only written#'
           path: tests/*
 
-        # Outer variables captured by-reference in closures lose their array type
-        # context when PHPStan analyses the closure body; the runtime type is correct.
-        - message: '#Cannot access an offset on mixed#'
-          path: tests/*
-
         # Intentional "no type" fixture handlers in tests exercise compiler error paths.
         - message: '#Method .* has no return type specified#'
           path: tests/*
@@ -79,8 +71,3 @@ parameters:
           path: tests/*
         - message: '#has no value type specified in iterable type array#'
           path: tests/*
-
-        # HandlerCompiler compiles class-strings whose __invoke makes them callable;
-        # PHPStan cannot prove object is callable without narrow type information.
-        - message: '#Trying to invoke object but it might not be a callable#'
-          path: src/Build/HandlerCompiler.php

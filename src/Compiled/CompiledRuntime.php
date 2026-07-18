@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Compiled;
 
-use Rokke\Runtime\Build\CompiledFactory;
 use Rokke\Runtime\Build\FactoryRepository;
 
 /**
@@ -38,8 +37,10 @@ final class CompiledRuntime
 		$this->artifacts  = $artifacts ?? ArtifactRepository::empty();
 	}
 
-	public function getService(string $alias): ?CompiledFactory
+	public function getService(string $alias): ?object
 	{
-		return $this->factories->get($alias);
+		$id = $this->factories->id($alias);
+
+		return $id !== null ? $this->factories->create($id) : null;
 	}
 }

@@ -7,6 +7,8 @@ namespace Rokke\Runtime\Tests\Engine;
 use PHPUnit\Framework\TestCase;
 use Rokke\Contracts\Execution\ExecutionInterceptorInterface;
 use Rokke\Runtime\Build\ApplicationModel;
+use Rokke\Runtime\Build\CompiledFactory;
+use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\OperationDefinition;
 use Rokke\Runtime\Builder\DefaultRuntimeBuilder;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
@@ -21,16 +23,59 @@ use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Engine\ExecutionEngine;
 
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+
 final class EngineHelloHandler
 {
+	public function __invoke(): string { return 'hello'; }
+}
+
+final class EngineCoreHandler
+{
+	public function __invoke(): string { return 'core'; }
+}
+
+final class EngineLogHandler
+{
+	/** @var list<string> */
+	public static array $log = [];
+
 	public function __invoke(): string
 	{
-		return 'hello';
+		self::$log[] = 'handler';
+		return 'result';
 	}
 }
 
+final class EngineThrowingHandler
+{
+	public function __invoke(): never
+	{
+		throw new \RuntimeException('handler blew up');
+	}
+}
+
+final class EngineTrackingHandler
+{
+	public static bool $called = false;
+
+	public function __invoke(): string
+	{
+		self::$called = true;
+		return 'should not run';
+	}
+}
+
+// ── Test ──────────────────────────────────────────────────────────────────────
+
 final class ExecutionEngineTest extends TestCase
 {
+	protected function setUp(): void
+	{
+		EngineLogHandler::$log     = [];
+		EngineTrackingHandler::$called = false;
+	}
+
 	private function makeCtx(): OperationContextInterface
 	{
 		return $this->createStub(OperationContextInterface::class);
@@ -44,14 +89,13 @@ final class ExecutionEngineTest extends TestCase
 		return $op;
 	}
 
-	private function makeRuntime(string $opId = 'op', ?callable $handler = null): CompiledRuntime
+	/** @param class-string $handlerClass */
+	private function makeRuntime(string $opId = 'op', string $handlerClass = EngineCoreHandler::class): CompiledRuntime
 	{
-		$handler ??= static fn (): string => 'core';
-
 		$op = new CompiledOperation($opId, 0, 0, 0, 0);
 
 		$execPipeline = new CompiledExecutionPipeline(
-			handlers: [0 => $handler],
+			factories: FactoryRepository::fromDescriptors([new CompiledFactory($handlerClass)]),
 			argumentPlans: [0 => new ArgumentResolutionPlan([])],
 			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
 			behaviorPipelines: [],
@@ -90,16 +134,14 @@ final class ExecutionEngineTest extends TestCase
 
 	public function testInterceptorWrapsEntireExecution(): void
 	{
-		$log         = [];
-		$interceptor = new class ($log) implements ExecutionInterceptorInterface {
-			/** @param list<string> $log */
-			public function __construct(private array &$log) {}
-
+		// Both the interceptor and EngineLogHandler write to EngineLogHandler::$log
+		// so the full execution order is captured in one place.
+		$interceptor = new class () implements ExecutionInterceptorInterface {
 			public function intercept(object $context, callable $next): mixed
 			{
-				$this->log[] = 'before';
-				$result       = $next();
-				$this->log[] = 'after';
+				EngineLogHandler::$log[] = 'before';
+				$result                  = $next();
+				EngineLogHandler::$log[] = 'after';
 
 				return $result;
 			}
@@ -108,10 +150,7 @@ final class ExecutionEngineTest extends TestCase
 		$op = new CompiledOperation('op', 0, 0, 0, 0);
 
 		$execPipeline = new CompiledExecutionPipeline(
-			handlers: [0 => static function () use (&$log): string {
-				$log[] = 'handler';
-				return 'result';
-			}],
+			factories: FactoryRepository::fromDescriptors([new CompiledFactory(EngineLogHandler::class)]),
 			argumentPlans: [0 => new ArgumentResolutionPlan([])],
 			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
 			behaviorPipelines: [],
@@ -127,7 +166,7 @@ final class ExecutionEngineTest extends TestCase
 		$engine = new ExecutionEngine($runtime);
 		$result = $engine->execute($this->makeOp(), $this->makeCtx());
 
-		$this->assertSame(['before', 'handler', 'after'], $log);
+		$this->assertSame(['before', 'handler', 'after'], EngineLogHandler::$log);
 		$this->assertSame('result', $result);
 	}
 
@@ -151,7 +190,7 @@ final class ExecutionEngineTest extends TestCase
 		$op = new CompiledOperation('op', 0, 0, 0, 0);
 
 		$execPipeline = new CompiledExecutionPipeline(
-			handlers: [0 => static fn (): never => throw new \RuntimeException('handler blew up')],
+			factories: FactoryRepository::fromDescriptors([new CompiledFactory(EngineThrowingHandler::class)]),
 			argumentPlans: [0 => new ArgumentResolutionPlan([])],
 			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
 			behaviorPipelines: [],
@@ -180,8 +219,6 @@ final class ExecutionEngineTest extends TestCase
 
 	public function testInterceptorBlockingPreventsHandlerExecution(): void
 	{
-		$handlerCalled = false;
-
 		$blocking = new class () implements ExecutionInterceptorInterface {
 			public function intercept(object $context, callable $next): mixed
 			{
@@ -192,11 +229,7 @@ final class ExecutionEngineTest extends TestCase
 		$op = new CompiledOperation('op', 0, 0, 0, 0);
 
 		$execPipeline = new CompiledExecutionPipeline(
-			handlers: [0 => static function () use (&$handlerCalled): string {
-				$handlerCalled = true;
-
-				return 'should not run';
-			}],
+			factories: FactoryRepository::fromDescriptors([new CompiledFactory(EngineTrackingHandler::class)]),
 			argumentPlans: [0 => new ArgumentResolutionPlan([])],
 			resultPlans: [0 => new ResultResolutionPlan(new ScalarResultInstruction('string'))],
 			behaviorPipelines: [],
@@ -216,7 +249,7 @@ final class ExecutionEngineTest extends TestCase
 		} catch (\RuntimeException) {
 		}
 
-		$this->assertFalse($handlerCalled);
+		$this->assertFalse(EngineTrackingHandler::$called);
 	}
 
 	// ── End-to-end via builder ────────────────────────────────────────────────

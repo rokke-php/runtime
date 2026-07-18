@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Cache;
 
+use Rokke\Runtime\Build\CompiledFactory;
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Compiled\CompiledExecutionPipeline;
@@ -55,18 +56,20 @@ final class RuntimeImporter
 	 */
 	public static function fromManifest(RuntimeManifest $manifest): CompiledRuntime
 	{
-		/** @var array<int, callable(): mixed> $handlers */
-		$handlers = array_map(
-			static fn (string $class): object => new $class(),
+		// Reconstruct handler FactoryRepository preserving the original int IDs
+		// so CompiledOperation::$factoryId values remain valid after deserialization.
+		$handlerDescriptors = array_map(
+			static fn (string $class): CompiledFactory => new CompiledFactory($class),
 			$manifest->handlerClasses,
 		);
+		$handlerRepo = FactoryRepository::fromDescriptors($handlerDescriptors);
 
-		$factories = $manifest->serviceDescriptors !== []
+		$serviceRepo = $manifest->serviceDescriptors !== []
 			? FactoryRepository::build($manifest->serviceDescriptors, new FactoryCompiler())
 			: FactoryRepository::empty();
 
 		$executionPipeline = new CompiledExecutionPipeline(
-			handlers: $handlers,
+			factories: $handlerRepo,
 			argumentPlans: $manifest->argumentPlans,
 			resultPlans: $manifest->resultPlans,
 			behaviorPipelines: [],
@@ -77,7 +80,7 @@ final class RuntimeImporter
 			executionPipeline: $executionPipeline,
 			interceptorPipeline: CompiledInterceptorPipeline::empty(),
 			operations: $manifest->operations,
-			factories: $factories,
+			factories: $serviceRepo,
 			artifacts: $manifest->artifacts,
 		);
 	}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Compiled;
 
+use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
 use Rokke\Runtime\Compiled\Results\ResultResolutionPlan;
 use Rokke\Runtime\Contracts\OperationContextInterface;
@@ -22,14 +23,13 @@ use Rokke\Runtime\Contracts\OperationContextInterface;
 final readonly class CompiledExecutionPipeline
 {
 	/**
-	 * @param array<int, callable>                 $handlers
 	 * @param array<int, ArgumentResolutionPlan>   $argumentPlans
 	 * @param array<int, ResultResolutionPlan>     $resultPlans
 	 * @param array<int, CompiledBehaviorPipeline> $behaviorPipelines
 	 * @param array<int, ValidationPlan>           $validationPlans
 	 */
 	public function __construct(
-		private array $handlers,
+		private FactoryRepository $factories,
 		private array $argumentPlans,
 		private array $resultPlans,
 		private array $behaviorPipelines,
@@ -52,8 +52,8 @@ final readonly class CompiledExecutionPipeline
 		}
 
 		// ── Stage 3: Invocation (+ optional Behavior wrapping) ────────────────
-		$handler = $this->handlers[$op->factoryId]
-			?? throw new \RuntimeException("Handler #{$op->factoryId} not found in CompiledExecutionPipeline.");
+		$handler = $this->factories->create($op->factoryId);
+		assert(is_callable($handler), "Factory ID {$op->factoryId} produced a non-callable object.");
 
 		$resultPlan = $this->resultPlans[$op->resultPlanId]
 			?? throw new \RuntimeException("ResultResolutionPlan #{$op->resultPlanId} not found in CompiledExecutionPipeline.");

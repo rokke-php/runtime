@@ -6,6 +6,7 @@ namespace Rokke\Runtime\Tests\Compiled\Arguments;
 
 use PHPUnit\Framework\TestCase;
 use Rokke\Runtime\Build\CompiledFactory;
+use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
 use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
 use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
@@ -31,27 +32,28 @@ final class ArgumentResolutionPlanTest extends TestCase
 
 	public function testSingleFactoryInstructionResolvesToCreatedInstance(): void
 	{
-		$instance = new \stdClass();
-		$factory  = new CompiledFactory(static fn (): object => $instance);
-		$plan     = new ArgumentResolutionPlan([new FactoryArgumentInstruction($factory)]);
-		$ctx      = $this->createStub(OperationContextInterface::class);
+		$factories = FactoryRepository::fromDescriptors([new CompiledFactory(\stdClass::class)]);
+		$plan      = new ArgumentResolutionPlan([new FactoryArgumentInstruction(0, $factories)]);
+		$ctx       = $this->createStub(OperationContextInterface::class);
+		$result    = $plan->resolveAll($ctx);
 
-		$this->assertSame([$instance], $plan->resolveAll($ctx));
+		$this->assertCount(1, $result);
+		$this->assertInstanceOf(\stdClass::class, $result[0]);
 	}
 
 	public function testMixedInstructionsPreserveOrder(): void
 	{
-		$dep = new \stdClass();
-		$ctx = $this->createStub(OperationContextInterface::class);
+		$factories = FactoryRepository::fromDescriptors([new CompiledFactory(\stdClass::class)]);
+		$ctx       = $this->createStub(OperationContextInterface::class);
 
 		$plan = new ArgumentResolutionPlan([
-			new FactoryArgumentInstruction(new CompiledFactory(static fn (): object => $dep)),
+			new FactoryArgumentInstruction(0, $factories),
 			new ContextArgumentInstruction(),
 		]);
 
 		[$resolvedDep, $resolvedCtx] = $plan->resolveAll($ctx);
 
-		$this->assertSame($dep, $resolvedDep);
+		$this->assertInstanceOf(\stdClass::class, $resolvedDep);
 		$this->assertSame($ctx, $resolvedCtx);
 	}
 

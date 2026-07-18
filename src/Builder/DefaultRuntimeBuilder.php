@@ -8,7 +8,6 @@ use Rokke\Runtime\Build\ApplicationModel;
 use Rokke\Runtime\Build\ArgumentPlanCompiler;
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
-use Rokke\Runtime\Build\HandlerCompiler;
 use Rokke\Runtime\Build\OperationDefinition;
 use Rokke\Runtime\Build\ResultPlanCompiler;
 use Rokke\Runtime\Build\ServiceDescriptor;
@@ -26,22 +25,29 @@ final class DefaultRuntimeBuilder
 {
 	public function build(ApplicationModel $model): RuntimeInterface
 	{
+		$operationDefs      = $model->definitions(OperationDefinition::class);
+		$serviceDescriptors = $model->definitions(ServiceDescriptor::class);
+
+		// Auto-register handler classes alongside services so FactoryRepository
+		// can instantiate them (with dependency injection) at dispatch time.
+		$handlerDescriptors = array_map(
+			static fn (OperationDefinition $d): ServiceDescriptor => new ServiceDescriptor($d->handler, $d->handler, [$d->handler]),
+			$operationDefs,
+		);
+
 		$factories = FactoryRepository::build(
-			$model->definitions(ServiceDescriptor::class),
+			array_merge($serviceDescriptors, $handlerDescriptors),
 			new FactoryCompiler(),
 		);
 
-		$handlerCompiler   = new HandlerCompiler();
 		$argCompiler       = new ArgumentPlanCompiler();
 		$resultCompiler    = new ResultPlanCompiler();
-		$handlers          = [];
 		$argumentPlans     = [];
 		$resultPlans       = [];
 		$behaviorPipelines = [];
 		$compiledOps       = [];
 
-		foreach ($model->definitions(OperationDefinition::class) as $index => $definition) {
-			$handlers[$index]      = $handlerCompiler->compile($definition->handler, $factories);
+		foreach ($operationDefs as $index => $definition) {
 			$argumentPlans[$index] = $argCompiler->compile($definition->handler, $factories);
 			$resultPlans[$index]   = $resultCompiler->compile($definition->handler);
 
@@ -57,7 +63,8 @@ final class DefaultRuntimeBuilder
 			$compiledOps[] = new CompiledOperation(
 				id: $definition->id,
 				pipelineId: 0,
-				factoryId: $index,
+				factoryId: $factories->id($definition->handler)
+					?? throw new \RuntimeException("Handler class '{$definition->handler}' was not registered in FactoryRepository."),
 				argumentPlanId: $index,
 				resultPlanId: $index,
 				behaviorPipelineId: $behaviorPipelineId,
@@ -65,7 +72,7 @@ final class DefaultRuntimeBuilder
 		}
 
 		$executionPipeline = new CompiledExecutionPipeline(
-			handlers: $handlers,
+			factories: $factories,
 			argumentPlans: $argumentPlans,
 			resultPlans: $resultPlans,
 			behaviorPipelines: $behaviorPipelines,

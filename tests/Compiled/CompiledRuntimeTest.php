@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Compiled;
 
 use PHPUnit\Framework\TestCase;
-use Rokke\Runtime\Build\CompiledFactory;
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\ServiceDescriptor;
@@ -28,7 +27,7 @@ final class CompiledRuntimeTest extends TestCase
 	private function emptyPipeline(): CompiledExecutionPipeline
 	{
 		return new CompiledExecutionPipeline(
-			handlers: [],
+			factories: FactoryRepository::empty(),
 			argumentPlans: [],
 			resultPlans: [],
 			behaviorPipelines: [],
@@ -127,10 +126,8 @@ final class CompiledRuntimeTest extends TestCase
 		$repo    = FactoryRepository::build([$descriptor], new FactoryCompiler());
 		$runtime = $this->makeRuntime(factories: $repo);
 
-		$factory = $runtime->getService(CompiledRuntimeServiceFixture::class);
-		$this->assertInstanceOf(CompiledFactory::class, $factory);
-		assert($factory instanceof CompiledFactory);
-		$this->assertInstanceOf(CompiledRuntimeServiceFixture::class, $factory->create());
+		$service = $runtime->getService(CompiledRuntimeServiceFixture::class);
+		$this->assertInstanceOf(CompiledRuntimeServiceFixture::class, $service);
 	}
 
 	public function testExplicitFactoryRepositoryIsStoredOnFactoriesField(): void
