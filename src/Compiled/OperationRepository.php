@@ -34,6 +34,12 @@ final class OperationRepository
 		return $repo;
 	}
 
+	/** @return list<CompiledOperation> */
+	public function all(): array
+	{
+		return array_values($this->index);
+	}
+
 	public function find(string $id): ?CompiledOperation
 	{
 		return $this->index[$id] ?? null;

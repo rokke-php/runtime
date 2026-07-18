@@ -6,6 +6,8 @@ namespace Rokke\Runtime;
 
 use Rokke\Contracts\Extension\ExtensionInterface;
 use Rokke\Runtime\Build\DiscoveryEngine;
+use Rokke\Runtime\Compiled\CompiledRuntime;
+use Rokke\Runtime\Engine\ExecutionEngine;
 use Rokke\Runtime\Build\ModelBuilder;
 use Rokke\Runtime\Build\OperationModelBuilderPass;
 use Rokke\Runtime\Build\ServiceModelBuilderPass;
@@ -41,6 +43,22 @@ final class ApplicationKernel
 
 		$model         = (new ModelBuilder([new OperationModelBuilderPass(), new ServiceModelBuilderPass()]))->build($allCapabilities);
 		$this->runtime = (new DefaultRuntimeBuilder())->build($model);
+	}
+
+	public function compiledRuntime(): CompiledRuntime
+	{
+		if ($this->runtime === null) {
+			throw new \RuntimeException('Call build() before compiledRuntime().');
+		}
+
+		assert($this->runtime instanceof ExecutionEngine);
+
+		return $this->runtime->compiledRuntime();
+	}
+
+	public function loadCompiledRuntime(CompiledRuntime $runtime): void
+	{
+		$this->runtime = new ExecutionEngine($runtime);
 	}
 
 	/** @param array<string, mixed> $metadata */

@@ -8,7 +8,7 @@ use Rokke\Runtime\Exception\ValidationException;
 
 final readonly class MaxValidationInstruction implements ValidationInstructionInterface
 {
-	public function __construct(private int|float $max) {}
+	public function __construct(public int|float $max) {}
 
 	public function validate(mixed $value, string $paramName): void
 	{

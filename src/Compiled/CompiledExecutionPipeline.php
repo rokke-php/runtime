@@ -36,6 +36,23 @@ final readonly class CompiledExecutionPipeline
 		private array $validationPlans,
 	) {}
 
+	public function argumentPlan(int $id): ArgumentResolutionPlan
+	{
+		return $this->argumentPlans[$id]
+			?? throw new \RuntimeException("ArgumentResolutionPlan #{$id} not registered.");
+	}
+
+	public function resultPlan(int $id): ResultResolutionPlan
+	{
+		return $this->resultPlans[$id]
+			?? throw new \RuntimeException("ResultResolutionPlan #{$id} not registered.");
+	}
+
+	public function validationPlan(int $id): ?ValidationPlan
+	{
+		return $this->validationPlans[$id] ?? null;
+	}
+
 	public function execute(CompiledOperation $op, OperationContextInterface $context): mixed
 	{
 		// ── Stage 1: Argument Resolution ──────────────────────────────────────

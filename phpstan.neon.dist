@@ -36,7 +36,7 @@ parameters:
 
         # PHPUnit stubs are minimal — only TestCase class + basic asserts are modelled.
         # In CI, real PHPUnit types are resolved via autoloader; local analysis accepts this gap.
-        - message: '#Call to an undefined method .*::(createStub|createMock|once|exactly|never|any|logicalOr|logicalAnd|equalTo|assertSame|assertNotSame|assertInstanceOf|assertTrue|assertFalse|assertNull|assertNotNull|assertCount|assertContains|assertContainsOnlyInstancesOf|assertStringContainsString|assertStringStartsWith|assertIsBool|assertGreaterThan|assertGreaterThanOrEqual|assertIsInt|assertIsString|assertIsArray|assertFileExists|assertFileDoesNotExist|expectException|expectExceptionMessage|markTestSkipped)\(\)#'
+        - message: '#Call to an undefined method .*::(createStub|createMock|once|exactly|never|any|logicalOr|logicalAnd|equalTo|assertSame|assertNotSame|assertInstanceOf|assertTrue|assertFalse|assertNull|assertNotNull|assertCount|assertContains|assertContainsOnlyInstancesOf|assertStringContainsString|assertStringNotContainsString|assertStringStartsWith|assertIsBool|assertGreaterThan|assertGreaterThanOrEqual|assertIsInt|assertIsString|assertIsArray|assertFileExists|assertFileDoesNotExist|expectException|expectExceptionMessage|markTestSkipped)\(\)#'
           path: tests/*
         - message: '#Cannot call method (expects|method|with|willThrowException|willReturn|willReturnCallback)\(\) on mixed#'
           path: tests/*

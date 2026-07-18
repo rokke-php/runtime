@@ -25,6 +25,11 @@ final readonly class ExecutionEngine implements RuntimeInterface
 {
 	public function __construct(private CompiledRuntime $runtime) {}
 
+	public function compiledRuntime(): CompiledRuntime
+	{
+		return $this->runtime;
+	}
+
 	public function execute(OperationInterface $operation, OperationContextInterface $context): mixed
 	{
 		$compiled = $this->runtime->operations->find($operation->id())

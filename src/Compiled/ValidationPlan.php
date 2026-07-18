@@ -22,6 +22,12 @@ final readonly class ValidationPlan
 		}
 	}
 
+	/** @return list<ParameterValidationPlan> */
+	public function params(): array
+	{
+		return $this->params;
+	}
+
 	public function isEmpty(): bool
 	{
 		return $this->params === [];

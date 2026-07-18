@@ -8,7 +8,7 @@ use Rokke\Runtime\Exception\ValidationException;
 
 final readonly class MinValidationInstruction implements ValidationInstructionInterface
 {
-	public function __construct(private int|float $min) {}
+	public function __construct(public int|float $min) {}
 
 	public function validate(mixed $value, string $paramName): void
 	{
