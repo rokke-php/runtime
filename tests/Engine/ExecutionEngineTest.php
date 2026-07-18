@@ -27,12 +27,18 @@ use Rokke\Runtime\Engine\ExecutionEngine;
 
 final class EngineHelloHandler
 {
-	public function __invoke(): string { return 'hello'; }
+	public function __invoke(): string
+	{
+		return 'hello';
+	}
 }
 
 final class EngineCoreHandler
 {
-	public function __invoke(): string { return 'core'; }
+	public function __invoke(): string
+	{
+		return 'core';
+	}
 }
 
 final class EngineLogHandler

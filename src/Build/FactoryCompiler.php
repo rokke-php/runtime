@@ -9,43 +9,43 @@ use ReflectionNamedType;
 
 final class FactoryCompiler
 {
-    /**
-     * @param callable(class-string): int $resolver  maps a type to its FactoryRepository ID
-     */
-    public function compile(ServiceDescriptor $descriptor, callable $resolver): CompiledFactory
-    {
-        $class       = $descriptor->implementation;
-        $reflection  = new ReflectionClass($class);
-        $constructor = $reflection->getConstructor();
+	/**
+	 * @param callable(class-string): int $resolver  maps a type to its FactoryRepository ID
+	 */
+	public function compile(ServiceDescriptor $descriptor, callable $resolver): CompiledFactory
+	{
+		$class       = $descriptor->implementation;
+		$reflection  = new ReflectionClass($class);
+		$constructor = $reflection->getConstructor();
 
-        if ($constructor === null || $constructor->getNumberOfParameters() === 0) {
-            return new CompiledFactory($class);
-        }
+		if ($constructor === null || $constructor->getNumberOfParameters() === 0) {
+			return new CompiledFactory($class);
+		}
 
-        $depIds = [];
+		$depIds = [];
 
-        foreach ($constructor->getParameters() as $param) {
-            $type = $param->getType();
+		foreach ($constructor->getParameters() as $param) {
+			$type = $param->getType();
 
-            if (!$type instanceof ReflectionNamedType) {
-                throw new \RuntimeException(
-                    "Parameter \${$param->getName()} of {$class}::__construct() has no usable type hint. " .
-                    'All injectable parameters must have a class or interface type.',
-                );
-            }
+			if (!$type instanceof ReflectionNamedType) {
+				throw new \RuntimeException(
+					"Parameter \${$param->getName()} of {$class}::__construct() has no usable type hint. " .
+					'All injectable parameters must have a class or interface type.',
+				);
+			}
 
-            if ($type->isBuiltin()) {
-                throw new \RuntimeException(
-                    "Parameter \${$param->getName()} of {$class}::__construct() has built-in type '{$type->getName()}'. " .
-                    'Only class and interface types are injectable.',
-                );
-            }
+			if ($type->isBuiltin()) {
+				throw new \RuntimeException(
+					"Parameter \${$param->getName()} of {$class}::__construct() has built-in type '{$type->getName()}'. " .
+					'Only class and interface types are injectable.',
+				);
+			}
 
-            /** @var class-string $typeName */
-            $typeName = $type->getName();
-            $depIds[] = $resolver($typeName);
-        }
+			/** @var class-string $typeName */
+			$typeName = $type->getName();
+			$depIds[] = $resolver($typeName);
+		}
 
-        return new CompiledFactory($class, $depIds);
-    }
+		return new CompiledFactory($class, $depIds);
+	}
 }
