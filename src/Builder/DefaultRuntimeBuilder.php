@@ -57,7 +57,7 @@ final class DefaultRuntimeBuilder
 			$compiledOps[] = new CompiledOperation(
 				id: $definition->id,
 				pipelineId: 0,
-				handlerId: $index,
+				factoryId: $index,
 				argumentPlanId: $index,
 				resultPlanId: $index,
 				behaviorPipelineId: $behaviorPipelineId,

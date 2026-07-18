@@ -141,6 +141,21 @@ final class CompiledRuntimeTest extends TestCase
 		$this->assertSame($repo, $runtime->factories);
 	}
 
+	// ── CompiledOperation: factoryId ─────────────────────────────────────────
+
+	public function testCompiledOperationExposesFactoryId(): void
+	{
+		$op = new CompiledOperation(
+			id: 'test',
+			pipelineId: 0,
+			factoryId: 5,
+			argumentPlanId: 0,
+			resultPlanId: 0,
+		);
+
+		$this->assertSame(5, $op->factoryId);
+	}
+
 	// ── artifacts ────────────────────────────────────────────────────────────
 
 	public function testArtifactsDefaultsToEmptyRepositoryWhenNotProvided(): void

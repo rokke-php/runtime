@@ -110,7 +110,7 @@ final class OperationRepositoryTest extends TestCase
 
 		$this->assertSame('op', $op->id);
 		$this->assertSame(10, $op->pipelineId);
-		$this->assertSame(20, $op->handlerId);
+		$this->assertSame(20, $op->factoryId);
 		$this->assertSame(30, $op->argumentPlanId);
 		$this->assertSame(40, $op->resultPlanId);
 	}

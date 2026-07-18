@@ -44,7 +44,7 @@ final class RuntimeCacheTest extends TestCase
 
 	private function buildManifest(bool $withValidation = false): RuntimeManifest
 	{
-		$op         = new CompiledOperation('ping', pipelineId: 0, handlerId: 0, argumentPlanId: 0, resultPlanId: 0);
+		$op         = new CompiledOperation('ping', pipelineId: 0, factoryId: 0, argumentPlanId: 0, resultPlanId: 0);
 		$operations = OperationRepository::build([$op]);
 
 		$argPlan    = new ArgumentResolutionPlan([new ContextArgumentInstruction()]);

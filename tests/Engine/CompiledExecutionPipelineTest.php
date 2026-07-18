@@ -54,7 +54,7 @@ final class CompiledExecutionPipelineTest extends TestCase
 	}
 
 	private function makeOp(
-		int $handlerId = 0,
+		int $factoryId = 0,
 		int $argPlanId = 0,
 		int $resultPlanId = 0,
 		?int $behaviorPipelineId = null,
@@ -62,7 +62,7 @@ final class CompiledExecutionPipelineTest extends TestCase
 		return new CompiledOperation(
 			id: 'op',
 			pipelineId: 0,
-			handlerId: $handlerId,
+			factoryId: $factoryId,
 			argumentPlanId: $argPlanId,
 			resultPlanId: $resultPlanId,
 			behaviorPipelineId: $behaviorPipelineId,

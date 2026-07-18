@@ -52,8 +52,8 @@ final readonly class CompiledExecutionPipeline
 		}
 
 		// ── Stage 3: Invocation (+ optional Behavior wrapping) ────────────────
-		$handler = $this->handlers[$op->handlerId]
-			?? throw new \RuntimeException("Handler #{$op->handlerId} not found in CompiledExecutionPipeline.");
+		$handler = $this->handlers[$op->factoryId]
+			?? throw new \RuntimeException("Handler #{$op->factoryId} not found in CompiledExecutionPipeline.");
 
 		$resultPlan = $this->resultPlans[$op->resultPlanId]
 			?? throw new \RuntimeException("ResultResolutionPlan #{$op->resultPlanId} not found in CompiledExecutionPipeline.");

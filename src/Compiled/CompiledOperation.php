@@ -13,12 +13,12 @@ final readonly class CompiledOperation
 {
 	public function __construct(
 		public string $id,
-		public int $pipelineId,
-		public int $handlerId,
-		public int $argumentPlanId,
-		public int $resultPlanId,
-		public int $interceptorChainId = 0,
-		public int $validationPlanId = 0,
-		public ?int $behaviorPipelineId = null,
+		public int    $pipelineId,
+		public int    $factoryId,
+		public int    $argumentPlanId,
+		public int    $resultPlanId,
+		public int    $interceptorChainId = 0,
+		public int    $validationPlanId = 0,
+		public ?int   $behaviorPipelineId = null,
 	) {}
 }
