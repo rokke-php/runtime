@@ -14,6 +14,6 @@ namespace Rokke\Runtime\Build;
  */
 interface ExtensionBuildPassInterface
 {
-    /** @return list<object> compiled configuration artifacts */
-    public function process(ApplicationModel $model): array;
+	/** @return list<object> compiled configuration artifacts */
+	public function process(ApplicationModel $model): array;
 }

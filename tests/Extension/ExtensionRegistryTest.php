@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Extension;
 
 use PHPUnit\Framework\TestCase;
-use Rokke\Contracts\Extension\ExtensionBuildInterface;
 use Rokke\Contracts\Extension\ExtensionBuilderInterface;
+use Rokke\Contracts\Extension\ExtensionBuildInterface;
 use Rokke\Contracts\Extension\ExtensionInterface;
 use Rokke\Contracts\Module\CapabilityInterface;
 use Rokke\Runtime\Build\ApplicationModel;
@@ -139,7 +139,10 @@ final class ExtensionRegistryTest extends TestCase
 	public function testGetBuildPassesCollectsFromExtensionBuildInterface(): void
 	{
 		$pass = new class () implements ExtensionBuildPassInterface {
-			public function process(ApplicationModel $model): array { return []; }
+			public function process(ApplicationModel $model): array
+			{
+				return [];
+			}
 		};
 
 		$extension = new class ($pass) implements ExtensionInterface, ExtensionBuildInterface {
@@ -147,7 +150,10 @@ final class ExtensionRegistryTest extends TestCase
 
 			public function register(ExtensionBuilderInterface $builder): void {}
 
-			public function buildPasses(): iterable { return [$this->pass]; }
+			public function buildPasses(): iterable
+			{
+				return [$this->pass];
+			}
 		};
 
 		$this->registry->register($extension);
@@ -158,22 +164,34 @@ final class ExtensionRegistryTest extends TestCase
 	public function testGetBuildPassesCollectsFromMultipleExtensions(): void
 	{
 		$passA = new class () implements ExtensionBuildPassInterface {
-			public function process(ApplicationModel $model): array { return []; }
+			public function process(ApplicationModel $model): array
+			{
+				return [];
+			}
 		};
 		$passB = new class () implements ExtensionBuildPassInterface {
-			public function process(ApplicationModel $model): array { return []; }
+			public function process(ApplicationModel $model): array
+			{
+				return [];
+			}
 		};
 
 		$extA = new class ($passA) implements ExtensionInterface, ExtensionBuildInterface {
 			public function __construct(private readonly ExtensionBuildPassInterface $pass) {}
 			public function register(ExtensionBuilderInterface $builder): void {}
-			public function buildPasses(): iterable { return [$this->pass]; }
+			public function buildPasses(): iterable
+			{
+				return [$this->pass];
+			}
 		};
 
 		$extB = new class ($passB) implements ExtensionInterface, ExtensionBuildInterface {
 			public function __construct(private readonly ExtensionBuildPassInterface $pass) {}
 			public function register(ExtensionBuilderInterface $builder): void {}
-			public function buildPasses(): iterable { return [$this->pass]; }
+			public function buildPasses(): iterable
+			{
+				return [$this->pass];
+			}
 		};
 
 		$this->registry->register($extA);
@@ -185,13 +203,19 @@ final class ExtensionRegistryTest extends TestCase
 	public function testGetBuildPassesSkipsExtensionsThatDontImplementBuildInterface(): void
 	{
 		$pass = new class () implements ExtensionBuildPassInterface {
-			public function process(ApplicationModel $model): array { return []; }
+			public function process(ApplicationModel $model): array
+			{
+				return [];
+			}
 		};
 
 		$withBuild = new class ($pass) implements ExtensionInterface, ExtensionBuildInterface {
 			public function __construct(private readonly ExtensionBuildPassInterface $pass) {}
 			public function register(ExtensionBuilderInterface $builder): void {}
-			public function buildPasses(): iterable { return [$this->pass]; }
+			public function buildPasses(): iterable
+			{
+				return [$this->pass];
+			}
 		};
 
 		$this->registry->register(new RecordingExtension()); // no ExtensionBuildInterface

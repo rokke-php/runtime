@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Build;
 
 use PHPUnit\Framework\TestCase;
-use Rokke\Contracts\Extension\ExtensionBuildInterface;
 use Rokke\Contracts\Extension\ExtensionBuilderInterface;
+use Rokke\Contracts\Extension\ExtensionBuildInterface;
 use Rokke\Contracts\Extension\ExtensionInterface;
 use Rokke\Runtime\ApplicationKernel;
 use Rokke\Runtime\Build\ApplicationModel;

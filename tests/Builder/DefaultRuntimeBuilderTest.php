@@ -23,7 +23,7 @@ final class BuilderConfigDescriptor implements ConfigurationDescriptorInterface 
 
 final class BuilderCompiledConfig
 {
-    public function __construct(public readonly string $value) {}
+	public function __construct(public readonly string $value) {}
 }
 
 final class BuilderTestDep {}

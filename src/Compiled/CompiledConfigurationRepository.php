@@ -6,73 +6,73 @@ namespace Rokke\Runtime\Compiled;
 
 final class CompiledConfigurationRepository
 {
-    /** @var array<class-string, object> */
-    private array $store;
+	/** @var array<class-string, object> */
+	private array $store;
 
-    /** @var list<object> */
-    private array $ordered;
+	/** @var list<object> */
+	private array $ordered;
 
-    /**
-     * @param array<class-string, object> $store
-     * @param list<object> $ordered
-     */
-    private function __construct(array $store, array $ordered)
-    {
-        $this->store   = $store;
-        $this->ordered = $ordered;
-    }
+	/**
+	 * @param array<class-string, object> $store
+	 * @param list<object> $ordered
+	 */
+	private function __construct(array $store, array $ordered)
+	{
+		$this->store   = $store;
+		$this->ordered = $ordered;
+	}
 
-    public static function empty(): self
-    {
-        return new self([], []);
-    }
+	public static function empty(): self
+	{
+		return new self([], []);
+	}
 
-    /**
-     * @param list<object> $configurations
-     * @throws \RuntimeException if two objects of the same class appear
-     */
-    public static function build(array $configurations): self
-    {
-        $store   = [];
-        $ordered = [];
+	/**
+	 * @param list<object> $configurations
+	 * @throws \RuntimeException if two objects of the same class appear
+	 */
+	public static function build(array $configurations): self
+	{
+		$store   = [];
+		$ordered = [];
 
-        foreach ($configurations as $config) {
-            $class = $config::class;
+		foreach ($configurations as $config) {
+			$class = $config::class;
 
-            if (isset($store[$class])) {
-                throw new \RuntimeException(
-                    "Duplicate compiled configuration: {$class} appears more than once. " .
-                    "Each configuration type must be unique within a build.",
-                );
-            }
+			if (isset($store[$class])) {
+				throw new \RuntimeException(
+					"Duplicate compiled configuration: {$class} appears more than once. " .
+					'Each configuration type must be unique within a build.',
+				);
+			}
 
-            $store[$class]  = $config;
-            $ordered[]      = $config;
-        }
+			$store[$class]  = $config;
+			$ordered[]      = $config;
+		}
 
-        return new self($store, $ordered);
-    }
+		return new self($store, $ordered);
+	}
 
-    public function has(string $class): bool
-    {
-        return isset($this->store[$class]);
-    }
+	public function has(string $class): bool
+	{
+		return isset($this->store[$class]);
+	}
 
-    /** @throws \RuntimeException if $class is not registered */
-    public function get(string $class): object
-    {
-        if (!isset($this->store[$class])) {
-            throw new \RuntimeException(
-                "Configuration '{$class}' is not registered in CompiledConfigurationRepository.",
-            );
-        }
+	/** @throws \RuntimeException if $class is not registered */
+	public function get(string $class): object
+	{
+		if (!isset($this->store[$class])) {
+			throw new \RuntimeException(
+				"Configuration '{$class}' is not registered in CompiledConfigurationRepository.",
+			);
+		}
 
-        return $this->store[$class];
-    }
+		return $this->store[$class];
+	}
 
-    /** @return list<object> */
-    public function all(): array
-    {
-        return $this->ordered;
-    }
+	/** @return list<object> */
+	public function all(): array
+	{
+		return $this->ordered;
+	}
 }
