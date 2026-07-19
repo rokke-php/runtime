@@ -41,8 +41,16 @@ final class ApplicationKernel
 
 		$allCapabilities = [...$builder->getCapabilities(), ...$discovered];
 
-		$model         = (new ModelBuilder([new OperationModelBuilderPass(), new ServiceModelBuilderPass()]))->build($allCapabilities);
-		$this->runtime = (new DefaultRuntimeBuilder())->build($model);
+		$model = (new ModelBuilder([new OperationModelBuilderPass(), new ServiceModelBuilderPass()]))->build($allCapabilities);
+
+		// Configuration descriptors are added to ApplicationModel so BuildPasses can read them
+		foreach ($builder->getConfigurationDescriptors() as $descriptor) {
+			$model->add($descriptor);
+		}
+
+		$buildPasses = $this->extensions->getBuildPasses();
+
+		$this->runtime = (new DefaultRuntimeBuilder())->build($model, $buildPasses);
 	}
 
 	public function compiledRuntime(): CompiledRuntime

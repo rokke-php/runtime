@@ -6,6 +6,7 @@ namespace Rokke\Runtime\Builder;
 
 use Rokke\Runtime\Build\ApplicationModel;
 use Rokke\Runtime\Build\ArgumentPlanCompiler;
+use Rokke\Runtime\Build\ExtensionBuildPassInterface;
 use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\OperationDefinition;
@@ -13,6 +14,7 @@ use Rokke\Runtime\Build\ResultPlanCompiler;
 use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Compiled\ArtifactRepository;
 use Rokke\Runtime\Compiled\CompiledBehaviorPipeline;
+use Rokke\Runtime\Compiled\CompiledConfigurationRepository;
 use Rokke\Runtime\Compiled\CompiledExecutionPipeline;
 use Rokke\Runtime\Compiled\CompiledInterceptorPipeline;
 use Rokke\Runtime\Compiled\CompiledOperation;
@@ -23,7 +25,8 @@ use Rokke\Runtime\Engine\ExecutionEngine;
 
 final class DefaultRuntimeBuilder
 {
-	public function build(ApplicationModel $model): RuntimeInterface
+	/** @param iterable<ExtensionBuildPassInterface> $extensionBuildPasses */
+	public function build(ApplicationModel $model, iterable $extensionBuildPasses = []): RuntimeInterface
 	{
 		$operationDefs      = $model->definitions(OperationDefinition::class);
 		$serviceDescriptors = $model->definitions(ServiceDescriptor::class);
@@ -79,12 +82,22 @@ final class DefaultRuntimeBuilder
 			validationPlans: [],
 		);
 
+		// Run extension build passes and assemble configuration repository
+		$configuredArtifacts = [];
+		foreach ($extensionBuildPasses as $pass) {
+			foreach ($pass->process($model) as $artifact) {
+				$configuredArtifacts[] = $artifact;
+			}
+		}
+		$configurations = CompiledConfigurationRepository::build($configuredArtifacts);
+
 		$compiled = new CompiledRuntime(
 			executionPipeline: $executionPipeline,
 			interceptorPipeline: CompiledInterceptorPipeline::empty(),
 			operations: OperationRepository::build($compiledOps),
 			factories: $factories,
 			artifacts: ArtifactRepository::empty(),
+			configurations: $configurations,
 		);
 
 		return new ExecutionEngine($compiled);
