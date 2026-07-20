@@ -13,6 +13,7 @@ use Rokke\Runtime\Build\CodeGen\NodeInterface;
 use Rokke\Runtime\Compiled\Arguments\ArgumentResolutionPlan;
 use Rokke\Runtime\Compiled\Arguments\ContextArgumentInstruction;
 use Rokke\Runtime\Compiled\Arguments\FactoryArgumentInstruction;
+use Rokke\Runtime\Compiled\CompiledConfigurationRepository;
 use Rokke\Runtime\Compiled\CompiledExecutionPipeline;
 use Rokke\Runtime\Compiled\CompiledInterceptorPipeline;
 use Rokke\Runtime\Compiled\CompiledOperation;
@@ -67,6 +68,7 @@ final class ArtifactCompiler
 			'interceptorPipeline' => new StaticCallNode(CompiledInterceptorPipeline::class, 'empty'),
 			'operations'          => $opsNode,
 			'factories'           => $repoNode,
+			'configurations'      => $this->emitConfigurationRepository($runtime->configurations()),
 		]);
 	}
 
@@ -168,6 +170,48 @@ final class ArtifactCompiler
 		return new NewObjectNode(ValidationPlan::class, [
 			'params' => new ArrayNode($paramNodes),
 		]);
+	}
+
+	private function emitConfigurationRepository(CompiledConfigurationRepository $repo): NodeInterface
+	{
+		$configNodes = array_map(
+			fn (object $config): NodeInterface => $this->emitCompiledConfiguration($config),
+			$repo->all(),
+		);
+
+		return new StaticCallNode(CompiledConfigurationRepository::class, 'build', [
+			new ArrayNode($configNodes),
+		]);
+	}
+
+	private function emitCompiledConfiguration(object $config): NodeInterface
+	{
+		$class = $config::class;
+		$ref   = new \ReflectionClass($config);
+		$ctor  = $ref->getConstructor();
+
+		if ($ctor === null) {
+			return new NewObjectNode($class, []);
+		}
+
+		$argNodes = [];
+
+		foreach ($ctor->getParameters() as $param) {
+			$name  = $param->getName();
+			$prop  = $ref->getProperty($name);
+			$value = $prop->getValue($config);
+
+			if (!is_string($value) && !is_int($value) && !is_float($value) && !is_bool($value) && $value !== null) {
+				throw new \RuntimeException(
+					"Cannot emit configuration property '{$class}::\${$name}': " .
+					'only string, int, float, bool, and null are supported in v0.23.0.',
+				);
+			}
+
+			$argNodes[$name] = new LiteralNode($value);
+		}
+
+		return new NewObjectNode($class, $argNodes);
 	}
 
 	private function emitOperation(CompiledOperation $op): NodeInterface

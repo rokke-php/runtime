@@ -13,17 +13,14 @@ use Rokke\Runtime\Build\FactoryRepository;
  *   - operations          — maps operation IDs to their compiled metadata
  *   - executionPipeline   — the single fixed Argument→Behavior→Invocation→Result pipeline
  *   - interceptorPipeline — the global observability wrapper (telemetry, logging, metrics)
- *   - factories / artifacts — service and artefact registries for modules
- *
- * The data tables (handlers, plans, pipelines) live inside CompiledExecutionPipeline,
- * keeping CompiledRuntime free of raw arrays and preventing it from acting as a
- * Service Locator. The ExecutionEngine never reads those tables directly.
+ *   - factories / artifacts / configurations — service, artefact, and configuration registries
  */
 final class CompiledRuntime
 {
 	public readonly FactoryRepository $factories;
 	public readonly OperationRepository $operations;
 	public readonly ArtifactRepository $artifacts;
+	private readonly CompiledConfigurationRepository $configurationsRepo;
 
 	public function __construct(
 		public readonly CompiledExecutionPipeline $executionPipeline,
@@ -31,10 +28,17 @@ final class CompiledRuntime
 		?OperationRepository $operations = null,
 		?FactoryRepository $factories = null,
 		?ArtifactRepository $artifacts = null,
+		?CompiledConfigurationRepository $configurations = null,
 	) {
-		$this->operations = $operations ?? OperationRepository::empty();
-		$this->factories  = $factories ?? FactoryRepository::empty();
-		$this->artifacts  = $artifacts ?? ArtifactRepository::empty();
+		$this->operations         = $operations ?? OperationRepository::empty();
+		$this->factories          = $factories ?? FactoryRepository::empty();
+		$this->artifacts          = $artifacts ?? ArtifactRepository::empty();
+		$this->configurationsRepo = $configurations ?? CompiledConfigurationRepository::empty();
+	}
+
+	public function configurations(): CompiledConfigurationRepository
+	{
+		return $this->configurationsRepo;
 	}
 
 	public function getService(string $alias): ?object

@@ -67,4 +67,39 @@ final class ExtensionBuilderTest extends TestCase
 		$this->assertSame([], $this->builder->getCapabilities());
 		$this->assertSame([$provider], $this->builder->getDiscoveryProviders());
 	}
+
+	public function testGetConfigurationDescriptorsEmptyByDefault(): void
+	{
+		$this->assertSame([], $this->builder->getConfigurationDescriptors());
+	}
+
+	public function testConfigurationStoresDescriptor(): void
+	{
+		$descriptor = new class () implements \Rokke\Contracts\Configuration\ConfigurationDescriptorInterface {};
+
+		$this->builder->configuration($descriptor);
+
+		$this->assertSame([$descriptor], $this->builder->getConfigurationDescriptors());
+	}
+
+	public function testConfigurationDescriptorsAreIndependentFromCapabilities(): void
+	{
+		$descriptor = new class () implements \Rokke\Contracts\Configuration\ConfigurationDescriptorInterface {};
+
+		$this->builder->configuration($descriptor);
+
+		$this->assertSame([], $this->builder->getCapabilities());
+		$this->assertSame([$descriptor], $this->builder->getConfigurationDescriptors());
+	}
+
+	public function testMultipleDescriptorsPreserveRegistrationOrder(): void
+	{
+		$a = new class () implements \Rokke\Contracts\Configuration\ConfigurationDescriptorInterface {};
+		$b = new class () implements \Rokke\Contracts\Configuration\ConfigurationDescriptorInterface {};
+
+		$this->builder->configuration($a);
+		$this->builder->configuration($b);
+
+		$this->assertSame([$a, $b], $this->builder->getConfigurationDescriptors());
+	}
 }

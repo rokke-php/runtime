@@ -6,14 +6,41 @@ namespace Rokke\Runtime\Tests\Build;
 
 use PHPUnit\Framework\TestCase;
 use Rokke\Contracts\Extension\ExtensionBuilderInterface;
+use Rokke\Contracts\Extension\ExtensionBuildInterface;
 use Rokke\Contracts\Extension\ExtensionInterface;
 use Rokke\Runtime\ApplicationKernel;
+use Rokke\Runtime\Build\ApplicationModel;
 use Rokke\Runtime\Build\ArtifactCompiler;
 use Rokke\Runtime\Build\CodeGen\PhpWriter;
+use Rokke\Runtime\Build\ExtensionBuildPassInterface;
 use Rokke\Runtime\Build\OperationCapability;
+use Rokke\Runtime\Compiled\CompiledConfigurationRepository;
 use Rokke\Runtime\Compiled\CompiledRuntime;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
+
+final class ArtifactConfig
+{
+	public function __construct(public readonly string $label) {}
+}
+
+final class ArtifactConfigBuildPass implements ExtensionBuildPassInterface
+{
+	public function process(ApplicationModel $model): array
+	{
+		return [new ArtifactConfig(label: 'compiled-value')];
+	}
+}
+
+final class ArtifactConfigExtension implements ExtensionInterface, ExtensionBuildInterface
+{
+	public function register(ExtensionBuilderInterface $builder): void {}
+
+	public function buildPasses(): iterable
+	{
+		return [new ArtifactConfigBuildPass()];
+	}
+}
 
 final class ArtifactDep {}
 
@@ -84,6 +111,30 @@ final class ArtifactCompilerTest extends TestCase
 		$result = $kernel->run('artifact-op');
 
 		$this->assertSame('from-artifact', $result);
+	}
+
+	public function testArtifactContainsConfigurations(): void
+	{
+		$kernel = new ApplicationKernel();
+		$kernel->register(new ArtifactConfigExtension());
+		$kernel->build();
+
+		$runtime  = $kernel->compiledRuntime();
+		$artifact = $this->loadArtifact($runtime);
+
+		$this->assertTrue($artifact->configurations()->has(ArtifactConfig::class));
+		$config = $artifact->configurations()->get(ArtifactConfig::class);
+		assert($config instanceof ArtifactConfig);
+		$this->assertSame('compiled-value', $config->label);
+	}
+
+	public function testArtifactWithNoConfigurationsHasEmptyRepository(): void
+	{
+		$runtime  = $this->buildRuntime();
+		$artifact = $this->loadArtifact($runtime);
+
+		$this->assertInstanceOf(CompiledConfigurationRepository::class, $artifact->configurations());
+		$this->assertSame([], $artifact->configurations()->all());
 	}
 
 	public function testArtifactContainsNoClosures(): void

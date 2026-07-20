@@ -5,15 +5,26 @@ declare(strict_types=1);
 namespace Rokke\Runtime\Tests\Builder;
 
 use PHPUnit\Framework\TestCase;
+use Rokke\Contracts\Configuration\ConfigurationDescriptorInterface;
 use Rokke\Runtime\Build\ApplicationModel;
+use Rokke\Runtime\Build\ExtensionBuildPassInterface;
 use Rokke\Runtime\Build\OperationDefinition;
 use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Builder\DefaultRuntimeBuilder;
+use Rokke\Runtime\Compiled\CompiledConfigurationRepository;
 use Rokke\Runtime\Contracts\OperationContextInterface;
 use Rokke\Runtime\Contracts\OperationInterface;
 use Rokke\Runtime\Contracts\RuntimeInterface;
+use Rokke\Runtime\Engine\ExecutionEngine;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
+
+final class BuilderConfigDescriptor implements ConfigurationDescriptorInterface {}
+
+final class BuilderCompiledConfig
+{
+	public function __construct(public readonly string $value) {}
+}
 
 final class BuilderTestDep {}
 
@@ -186,5 +197,64 @@ final class DefaultRuntimeBuilderTest extends TestCase
 
 		$this->assertSame('result-a', $runtime->execute($this->makeOperation('op.a'), $this->makeContext()));
 		$this->assertSame('result-b', $runtime->execute($this->makeOperation('op.b'), $this->makeContext()));
+	}
+
+	public function testBuiltRuntimeHasEmptyConfigurationsWhenNoPassesProvided(): void
+	{
+		$model   = new ApplicationModel();
+		$runtime = $this->builder->build($model);
+
+		assert($runtime instanceof ExecutionEngine);
+		$compiled = $runtime->compiledRuntime();
+
+		$this->assertInstanceOf(CompiledConfigurationRepository::class, $compiled->configurations());
+		$this->assertSame([], $compiled->configurations()->all());
+	}
+
+	public function testBuiltRuntimeRunsBuildPassAndStoresResult(): void
+	{
+		$compiledConfig = new BuilderCompiledConfig('hello');
+
+		$pass = new class ($compiledConfig) implements ExtensionBuildPassInterface {
+			public function __construct(private readonly object $result) {}
+
+			public function process(ApplicationModel $model): array
+			{
+				return [$this->result];
+			}
+		};
+
+		$model = new ApplicationModel();
+		$model->add(new BuilderConfigDescriptor());
+
+		$runtime = $this->builder->build($model, [$pass]);
+
+		assert($runtime instanceof ExecutionEngine);
+		$compiled = $runtime->compiledRuntime();
+
+		$this->assertTrue($compiled->configurations()->has(BuilderCompiledConfig::class));
+		$this->assertSame($compiledConfig, $compiled->configurations()->get(BuilderCompiledConfig::class));
+	}
+
+	public function testBuildPassReceivesApplicationModelWithDescriptors(): void
+	{
+		$descriptor = new BuilderConfigDescriptor();
+		$pass       = new class () implements ExtensionBuildPassInterface {
+			public ?ApplicationModel $captured = null;
+
+			public function process(ApplicationModel $model): array
+			{
+				$this->captured = $model;
+				return [];
+			}
+		};
+
+		$model = new ApplicationModel();
+		$model->add($descriptor);
+
+		$this->builder->build($model, [$pass]);
+
+		$this->assertNotNull($pass->captured);
+		$this->assertSame([$descriptor], $pass->captured->definitions(BuilderConfigDescriptor::class));
 	}
 }

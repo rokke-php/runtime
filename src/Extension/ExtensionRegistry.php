@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Rokke\Runtime\Extension;
 
+use Rokke\Contracts\Extension\ExtensionBuildInterface;
 use Rokke\Contracts\Extension\ExtensionInterface;
+use Rokke\Runtime\Build\ExtensionBuildPassInterface;
 
 /**
  * Collects registered extensions and drives the build phase.
@@ -31,5 +33,21 @@ final class ExtensionRegistry
 		foreach ($this->extensions as $extension) {
 			$extension->register($builder);
 		}
+	}
+
+	/** @return list<ExtensionBuildPassInterface> */
+	public function getBuildPasses(): array
+	{
+		$passes = [];
+
+		foreach ($this->extensions as $extension) {
+			if ($extension instanceof ExtensionBuildInterface) {
+				foreach ($extension->buildPasses() as $pass) {
+					$passes[] = $pass;
+				}
+			}
+		}
+
+		return $passes;
 	}
 }

@@ -9,6 +9,7 @@ use Rokke\Runtime\Build\FactoryCompiler;
 use Rokke\Runtime\Build\FactoryRepository;
 use Rokke\Runtime\Build\ServiceDescriptor;
 use Rokke\Runtime\Compiled\ArtifactRepository;
+use Rokke\Runtime\Compiled\CompiledConfigurationRepository;
 use Rokke\Runtime\Compiled\CompiledExecutionPipeline;
 use Rokke\Runtime\Compiled\CompiledInterceptorPipeline;
 use Rokke\Runtime\Compiled\CompiledOperation;
@@ -39,6 +40,7 @@ final class CompiledRuntimeTest extends TestCase
 		?OperationRepository $operations = null,
 		?FactoryRepository $factories = null,
 		?ArtifactRepository $artifacts = null,
+		?CompiledConfigurationRepository $configurations = null,
 	): CompiledRuntime {
 		return new CompiledRuntime(
 			executionPipeline: $this->emptyPipeline(),
@@ -46,6 +48,7 @@ final class CompiledRuntimeTest extends TestCase
 			operations: $operations,
 			factories: $factories,
 			artifacts: $artifacts,
+			configurations: $configurations,
 		);
 	}
 
@@ -171,5 +174,25 @@ final class CompiledRuntimeTest extends TestCase
 
 		$this->assertSame($repo, $runtime->artifacts);
 		$this->assertSame($artifact, $runtime->artifacts->get(CompiledRuntimeArtifactFixture::class));
+	}
+
+	// ── configurations ───────────────────────────────────────────────────────────
+
+	public function testConfigurationsDefaultsToEmptyRepositoryWhenNotProvided(): void
+	{
+		$runtime = $this->makeRuntime();
+
+		$this->assertInstanceOf(CompiledConfigurationRepository::class, $runtime->configurations());
+		$this->assertSame([], $runtime->configurations()->all());
+	}
+
+	public function testConfigurationsExposesPassedRepository(): void
+	{
+		$config = new CompiledRuntimeArtifactFixture(); // reuse fixture as any object
+		$repo   = CompiledConfigurationRepository::build([$config]);
+		$runtime = $this->makeRuntime(configurations: $repo);
+
+		$this->assertSame($repo, $runtime->configurations());
+		$this->assertSame($config, $runtime->configurations()->get(CompiledRuntimeArtifactFixture::class));
 	}
 }
